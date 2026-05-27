@@ -1,0 +1,37 @@
+[
+  {
+    "id": "NeonScratchLounge",
+    "type": "location",
+    "description": "The resistance headquarters. A dimly lit jazz bar that smells of tuna and old leather. Owned by Madame Fluffington, an ancient Persian cat who knows every secret in Neo-Pawsburg. Safe zone — no RoombaCore drones operate here.",
+    "encounters": [],
+    "npcs": ["MadameFluffington", "GlitchTheTechCat"]
+  },
+  {
+    "id": "ChromeAlley",
+    "type": "location",
+    "description": "A rain-slicked back alley lit by malfunctioning neon signs. RoombaCore patrol drones sweep every 10 minutes. Laser pointer graffiti covers every wall. High encounter chance.",
+    "encounters": ["RoombaDrone", "LaserGang"],
+    "lootTable": ["CreditChips", "HackingClaws"]
+  },
+  {
+    "id": "RoombaCoreTower",
+    "type": "location",
+    "description": "The gleaming corporate headquarters of RoombaCore. 40 floors of brushed steel and vacuum technology. Heavily guarded. Final dungeon area.",
+    "encounters": ["EliteRoombaDrone", "VacuumDemon", "CEORoomba"],
+    "lootTable": ["MasterHackingKey", "DragonScalePowerArmor"]
+  },
+  {
+    "id": "NightMarket",
+    "type": "location",
+    "description": "A sprawling underground market where cats trade stolen tech, black market tuna, and forged identification chips. Morally grey but mostly safe. Good place to spend CreditChips.",
+    "encounters": ["PickpocketKitten"],
+    "npcs": ["FenceCatMerchant", "InfoBrokerTabby"]
+  },
+  {
+    "id": "SewersOfForgetfulness",
+    "type": "location",
+    "description": "The ancient sewer network beneath Neo-Pawsburg. Smells terrible. Home to feral cats who rejected society and giant mutant rats. Medium danger.",
+    "encounters": ["MutantRat", "FeralCatBoss"],
+    "lootTable": ["OldCoinStash", "MysteryCanOfTuna"]
+  }
+]

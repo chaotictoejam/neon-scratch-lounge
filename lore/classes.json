@@ -1,0 +1,54 @@
+[
+  {
+    "id": "TabbyWarrior",
+    "type": "class",
+    "description": "The TabbyWarrior is the bruiser of Neo-Pawsburg's underground. Born in the streets, hardened by alley fights and narrow escapes, the TabbyWarrior relies on raw physical power — pawStrength — and an uncanny survival instinct that defies biology itself.",
+    "backstory": "Legend says the first TabbyWarrior survived a direct hit from a MkI RoombaCore industrial unit. They walked away with a slight limp and an unmatched fury. Since then, the tabby bloodline has carried a gift: the Nine Lives Passive. You cannot kill what refuses to die.",
+    "playstyle": "Frontline fighter. Absorb damage, deal heavy physical attacks. Use pawStrength for melee combat. The Nine Lives Passive makes the TabbyWarrior perfect for aggressive, high-risk play — wade into combat, knowing you have one guaranteed second chance per campaign. Best in ChromeAlley brawls and direct confrontations with RoombaCore drones.",
+    "stats": { "hp": 120, "maxHp": 120, "pawStrength": 8, "agility": 5, "arcane": 2, "stealth": 4, "gold": 10 },
+    "special": "NineLifesPassive",
+    "specialDescription": "Once per campaign, when the TabbyWarrior would be reduced to 0hp, they instead survive with exactly 1hp remaining. This triggers automatically — no action required. The nineLivesUsed flag is set to true afterward. Cannot trigger a second time. The DM should narrate this as a dramatic near-death moment.",
+    "weakness": "Low arcane means SiameseMage-type enemies (laser, psychic attacks) deal full damage. Stealth of 4 makes sneaking difficult — expect to fight, not sneak.",
+    "names": ["Claws McGee", "Sergeant Fluffkins", "Rex Pawsworth", "Brawler McStripes"],
+    "dmNarrationNotes": "Narrate TabbyWarrior actions as powerful and direct. They don't plan — they act. Describe their strikes as 'a paw like a freight drone' and their movements as 'deliberate, purposeful, slightly terrifying.' When Nine Lives triggers, pause the narration: 'Something ancient stirs in your bloodline. You should be dead. You are not.'"
+  },
+  {
+    "id": "SiameseMage",
+    "type": "class",
+    "description": "The SiameseMage channels the arcane frequencies that permeate Neo-Pawsburg's neon-drenched electromagnetic smog. They are fragile in body but devastating in power, capable of focusing the city's latent energy into focused arcane strikes.",
+    "backstory": "The Siamese lineage carries an unusual sensitivity to electromagnetic fields — a trait that manifested as arcane ability after the city filled with RoombaCore signal jamming. The megacorp created the very weapon that opposes it. The SiameseMage sees poetry in this. They also see in the ultraviolet spectrum, which is less poetic but more useful.",
+    "playstyle": "Glass cannon. Low HP, high arcane damage. The LaserFocusSpell ability lets the SiameseMage sacrifice 10hp to deal 3x arcane damage on the next attack — a gamble that rewards decisive play. Use agility for dodge-heavy tactics. Keep enemies at range. Terrible in melee; devastating in prepared ambushes.",
+    "stats": { "hp": 70, "maxHp": 70, "pawStrength": 3, "agility": 6, "arcane": 9, "stealth": 5, "gold": 15 },
+    "special": "LaserFocusSpell",
+    "specialDescription": "The SiameseMage declares LaserFocusSpell before rolling an attack. They immediately lose 10hp (this cannot be blocked or prevented). On that attack, add arcane stat x3 to damage instead of the normal arcane bonus. The declaration must happen before the dice roll — retroactive activation is not permitted. No cooldown, but the hp cost limits overuse naturally.",
+    "weakness": "70hp is a liability in prolonged fights. Physical damage from TabbyWarrior-type enemies (RoombaDrones using vacuum, MutantRats biting) bypasses arcane defenses. Low pawStrength means melee is suicidal.",
+    "names": ["Whisper von Silk", "Madame Azurepaw", "The Blue Pointist", "Oracle Meowstein"],
+    "dmNarrationNotes": "Narrate SiameseMage with elegant precision. They speak little. When they act, it is with total commitment. LaserFocusSpell should be narrated as the mage going very still, eyes narrowing to slits, the air around them humming — then a single devastating strike. Their fragility is part of the character: 'You can feel your HP draining into the spell. Worth it, you think. Probably.'"
+  },
+  {
+    "id": "MaineCoonPaladin",
+    "type": "class",
+    "description": "The MaineCoonPaladin is the holy knight of the Scratch resistance — large, magnificent, and operating under a personal code of honor that confuses enemies and occasionally allies. The HolyHairballShield makes them the best tank in Neo-Pawsburg.",
+    "backstory": "The Maine Coon line descends from the Temple Cats of the Pre-Leash era, guardians of the ancient tuna vaults. They carry that sacred duty forward, now applied to protecting resistance operatives and blocking corporate drone attacks. Their hair is legendary. Their shield is divine. Their gold starting amount (20 CreditChips) reflects family inheritance, which they find mildly embarrassing.",
+    "playstyle": "Tank and support. High HP, balanced stats, the best single-use damage block in the game. The HolyHairballShield blocks up to 15 damage once per combat encounter — use it when taking a big hit. Pairs well with aggressive allies. Moderate arcane means they can handle magical enemies. Not the fastest (agility 3) so positioning matters.",
+    "stats": { "hp": 100, "maxHp": 100, "pawStrength": 6, "agility": 3, "arcane": 5, "stealth": 2, "gold": 20 },
+    "special": "HolyHairballShield",
+    "specialDescription": "Once per combat encounter, the MaineCoonPaladin can activate the HolyHairballShield to block up to 15 points of incoming damage. The shieldUsedThisEncounter flag is set to true and resets to false when combat ends (persist-campaign handles this). The shield activates automatically on the largest hit of an encounter if the player has not manually declared it — or the player can declare it proactively. Cannot block more than 15 even if the attack exceeds this.",
+    "weakness": "Stealth of 2 makes the MaineCoonPaladin terrible at sneaking. Enemies notice them immediately. Agility 3 means they are often hit. They compensate by having HP to spare and a shield. The large fur coat also makes them slightly slow in water-based areas.",
+    "names": ["Sir Fluffington III", "Brother Bigpaws", "The Righteous Mane", "Paladin Cheddar"],
+    "dmNarrationNotes": "Narrate the MaineCoonPaladin with dignity and mild pomposity. They announce themselves before striking. The HolyHairballShield manifest as a shimmering wall of luxurious fur — 'You raise the ancient shield. It is, honestly, mostly hair. But it holds.' When stealth checks fail: 'You attempt to hide. You are a large, magnificent Maine Coon. You have not succeeded. The drone sees you immediately.'"
+  },
+  {
+    "id": "SphinxRogue",
+    "type": "class",
+    "description": "The SphinxRogue is a whisper in the dark streets of Neo-Pawsburg — hairless, inscrutable, operating in the gaps between corporate surveillance zones. With the highest agility and stealth in the game, they are the ideal infiltrator. SandstormVanish makes them untouchable when they choose to be.",
+    "backstory": "The Sphinx line arrived in Neo-Pawsburg from the Eastern Desert Wastelands, where they developed advanced sand-manipulation techniques to survive RoombaCore's desert expansion units. In the city, sand becomes shadow. The SphinxRogue adapted. Nobody is quite sure what they think about anything, which is part of the technique.",
+    "playstyle": "Stealth and hit-and-run. Agility 9 and Stealth 9 are the highest of any class — use them constantly. SandstormVanish disappears the SphinxRogue for one turn on a 3-turn cooldown, making all attacks miss. Excellent for avoiding big hits, setting up ambushes, and escaping bad situations. The 25 starting gold (highest of any class) reflects years of professional information brokering.",
+    "stats": { "hp": 80, "maxHp": 80, "pawStrength": 4, "agility": 9, "arcane": 4, "stealth": 9, "gold": 25 },
+    "special": "SandstormVanish",
+    "specialDescription": "The SphinxRogue declares SandstormVanish as their action for the turn. They vanish entirely — all enemy attacks automatically miss for that turn. The vanishCooldownTurnsLeft is set to 3 after use. persist-campaign decrements this by 1 each turn. Vanish cannot be used while vanishCooldownTurnsLeft > 0. The DM must track this and inform the player when it becomes available again. Does not affect player's ability to act on subsequent turns.",
+    "weakness": "Lowest pawStrength (4) means direct melee combat is inadvisable. Low arcane (4) means magical enemies resist physical approaches. The SphinxRogue is powerful through avoidance — in direct confrontations they have fewer options than other classes.",
+    "names": ["Sandpaw", "The Unnamed One", "Ghost of the Alley", "Null"],
+    "dmNarrationNotes": "Narrate the SphinxRogue with economy. Few words. They are observed less than they observe. SandstormVanish: 'You exhale. The alley shadows accept you. For one moment, you are not here.' When enemies miss during Vanish: 'The drone's sensors sweep the area. There is nothing to find.' Their names in-world should be whispered, not announced."
+  }
+]

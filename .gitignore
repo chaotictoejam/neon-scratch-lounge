@@ -1,0 +1,44 @@
+# CDK
+cdk.out/
+cdk.context.json
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.js
+*.js.map
+*.d.ts
+!jest.config.js
+
+# Build output
+dist/
+build/
+
+# Lambda build artifacts
+lambda/**/node_modules/
+lambda/**/*.js
+lambda/**/*.js.map
+lambda/**/*.d.ts
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

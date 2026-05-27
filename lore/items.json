@@ -1,0 +1,86 @@
+[
+  {
+    "id": "HackingClaws",
+    "type": "item",
+    "description": "Retractable chrome claws that interface with RoombaCore systems.",
+    "effect": "+3 to hacking actions, 1d6 bonus damage vs drones"
+  },
+  {
+    "id": "LaserPointerMk2",
+    "type": "item",
+    "description": "Military grade. Creates a dot so compelling enemies must chase it for one turn.",
+    "effect": "Stun enemy for 1 turn, 1 charge per combat"
+  },
+  {
+    "id": "AncientCatnip",
+    "type": "item",
+    "description": "Pre-corporate catnip of legendary quality. Effects are unpredictable but always dramatic.",
+    "effect": "Roll 1d6: 1-2 restore 50hp, 3-4 deal 50 damage to random enemy, 5-6 both"
+  },
+  {
+    "id": "MysteryCanOfTuna",
+    "type": "item",
+    "description": "Restore 40hp. The mystery is why it tastes this good.",
+    "effect": "Restore 40hp"
+  },
+  {
+    "id": "NeonScratchCoat",
+    "type": "item",
+    "description": "A sleek jacket with embedded LED strips. Reduces laser damage and looks incredible.",
+    "effect": "-3 to all laser damage received"
+  },
+  {
+    "id": "DroneCore",
+    "type": "item",
+    "description": "Salvaged from a defeated RoombaCore drone. Can be sold or used to craft.",
+    "effect": "Sell for 15 CreditChips or combine 3 for HackingClaws"
+  },
+  {
+    "id": "MasterHackingKey",
+    "type": "item",
+    "description": "A master key card granting access to all RoombaCore systems. The resistance has wanted this for years.",
+    "effect": "Unlocks RoombaCoreTower secured areas, +5 to all hacking actions"
+  },
+  {
+    "id": "EliteDroneCore",
+    "type": "item",
+    "description": "The processing core of an Elite RoombaCore drone. Highly valuable on the black market.",
+    "effect": "Sell for 50 CreditChips or upgrade HackingClaws"
+  },
+  {
+    "id": "VacuumDemonCore",
+    "type": "item",
+    "description": "The dark essence of the Vacuum Demon, crystallized into a dense black sphere. Hums ominously.",
+    "effect": "Legendary item: grants immunity to vacuum damage type"
+  },
+  {
+    "id": "RatTooth",
+    "type": "item",
+    "description": "A large molar from a mutant sewer rat. Good luck charm, apparently.",
+    "effect": "+1 to stealth checks in sewers"
+  },
+  {
+    "id": "DragonScalePowerArmor",
+    "type": "item",
+    "description": "Armor forged from the scales of the legendary NeoTokyo Dragon Cat. Mythic rarity.",
+    "effect": "-5 to all damage received, +2 to all stats"
+  },
+  {
+    "id": "TinyBusinessSuit",
+    "type": "item",
+    "description": "The CEO Roomba's business suit, sized for a disc-shaped robot. Stylish in a bleak way.",
+    "effect": "Trophy item. Equip for +10 gold per combat as enemies respect the suit."
+  },
+  {
+    "id": "OldCoinStash",
+    "type": "item",
+    "description": "Pre-corporate currency. Most merchants won't take it but a few nostalgic types will.",
+    "effect": "Worth 30 CreditChips to the right merchant"
+  },
+  {
+    "id": "CreditChips",
+    "type": "currency",
+    "description": "Neo-Pawsburg's standard digital currency. RoombaCore issues them. The resistance uses them anyway.",
+    "effect": "Currency — added to gold total"
+  }
+]

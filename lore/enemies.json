@@ -1,0 +1,63 @@
+[
+  {
+    "id": "RoombaDrone",
+    "type": "enemy",
+    "description": "A standard RoombaCore patrol unit. Circular, relentless, makes a sound that fills cats with primal dread.",
+    "hp": 30,
+    "damage": "1d8",
+    "damageType": "vacuum",
+    "weakness": "water",
+    "drops": ["CreditChips", "DroneCore"],
+    "flavorText": "It hums menacingly. You feel an ancestral terror."
+  },
+  {
+    "id": "LaserGangMember",
+    "type": "enemy",
+    "description": "A street cat gone corporate. Wields a military-grade laser pointer. Moves unpredictably.",
+    "hp": 40,
+    "damage": "2d6",
+    "damageType": "laser",
+    "weakness": "darkness",
+    "drops": ["LaserPointerMk2", "CreditChips"]
+  },
+  {
+    "id": "MutantRat",
+    "type": "enemy",
+    "description": "A sewer rat the size of a small dog, mutated by RoombaCore chemical waste. Surprisingly philosophical about its condition.",
+    "hp": 50,
+    "damage": "1d10",
+    "damageType": "bite",
+    "weakness": "arcane",
+    "drops": ["MysteryCanOfTuna", "RatTooth"]
+  },
+  {
+    "id": "EliteRoombaDrone",
+    "type": "enemy",
+    "description": "A premium RoombaCore model with a self-destruct function and surprisingly good WiFi.",
+    "hp": 80,
+    "damage": "2d8+5",
+    "damageType": "vacuum",
+    "weakness": "water",
+    "drops": ["EliteDroneCore", "CreditChips"]
+  },
+  {
+    "id": "VacuumDemon",
+    "type": "enemy",
+    "description": "An ancient evil that predates RoombaCore. The original Vacuum. Cats have feared it across generations. Boss encounter.",
+    "hp": 200,
+    "damage": "3d10",
+    "damageType": "existentialVacuum",
+    "weakness": "purring",
+    "drops": ["VacuumDemonCore", "AncientCatnip"]
+  },
+  {
+    "id": "CEORoomba",
+    "type": "enemy",
+    "description": "The final boss. A Roomba wearing a tiny business suit. Surprisingly articulate. Has a monologue.",
+    "hp": 300,
+    "damage": "4d10",
+    "damageType": "corporate",
+    "weakness": "chaos",
+    "drops": ["MasterHackingKey", "TinyBusinessSuit"]
+  }
+]
