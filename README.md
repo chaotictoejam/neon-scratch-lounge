@@ -65,6 +65,34 @@ Wait **3-5 minutes** for the Bedrock Knowledge Base ingestion job to complete af
 
 ---
 
+## UI (conference demo screen)
+
+The `ui/` directory is a React app with a cyberpunk neon aesthetic — a two-panel split showing the game on the left and live AWS mechanics (Step Functions trace, Lambda telemetry, token counts) on the right.
+
+```bash
+cd ui
+npm install
+cp .env.local.example .env.local
+# Paste your API Gateway URL into VITE_API_GATEWAY_URL in .env.local
+# The ApiUrl output from `cdk deploy NeonScratchApi` has the value.
+npm run dev
+# Open http://localhost:5173
+```
+
+For production build (S3 + CloudFront):
+
+```bash
+npm run build
+aws s3 sync dist/ s3://your-ui-bucket
+```
+
+**On-stage browser setup:**
+- Zoom to 110% for projector readability
+- Pre-start a SphinxRogue game (Sandpaw — high AGI/STL makes dice rolls dramatic)
+- Press `Ctrl+Shift+F` in the browser to toggle failure injection mode for Beat 3 (red banner appears; auto-disables after 3 s)
+
+---
+
 ## Play the game
 
 ```bash
