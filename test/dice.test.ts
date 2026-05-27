@@ -1,4 +1,5 @@
 // Tests for dice rolling mechanics and stat bonus application
+export {};
 
 // Extracted dice logic for testing without DynamoDB dependency
 function rollDie(sides: number): number {

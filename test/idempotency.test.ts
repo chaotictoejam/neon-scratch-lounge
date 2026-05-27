@@ -1,4 +1,5 @@
 // Tests for idempotency cache logic (without DynamoDB)
+export {};
 
 function makeIdempotencyKey(campaignId: string, turnId: string, toolName: string, purpose: string): string {
   return `${campaignId}:${turnId}:${toolName}:${purpose}`;

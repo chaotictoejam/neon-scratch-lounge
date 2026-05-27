@@ -1,10 +1,14 @@
-import { FormattedResponse, WorkflowInput, DMOutput, ToolResult, DiceRollResult } from "../shared/types";
+import { FormattedResponse, WorkflowInput, DMOutput, ToolResult, DiceRollResult, WorkflowStep, LogLine, TurnMetrics } from "../shared/types";
 
 type FormatInput = WorkflowInput & {
   dmOutput: DMOutput;
   toolResults: { result: ToolResult }[];
   validatedToolCalls: unknown[];
   loreChunks: unknown[];
+  // Populated by the dungeon-controller after SFN execution completes
+  workflowTrace?: WorkflowStep[];
+  logLines?: LogLine[];
+  metrics?: TurnMetrics;
 };
 
 export const handler = async (input: FormatInput): Promise<FormattedResponse> => {
@@ -32,6 +36,24 @@ export const handler = async (input: FormatInput): Promise<FormattedResponse> =>
 
   const activeEffectNames = campaign.activeEffects.map((e) => `${e.effect} (${e.turnsRemaining}t)`);
 
+  // Build tool call list for metrics
+  const toolCallNames = (toolResults ?? [])
+    .map((tr) => (tr?.result as ToolResult | undefined)?.toolName)
+    .filter((n): n is string => !!n);
+  const toolCallsSummary = toolCallNames.reduce<string[]>((acc, name) => {
+    const existing = acc.find((s) => s.startsWith(name));
+    if (existing) {
+      return acc.map((s) => s.startsWith(name) ? `${name} ×${parseInt(s.split("×")[1] ?? "1") + 1}` : s);
+    }
+    return [...acc, name];
+  }, []);
+
+  const metrics: TurnMetrics = input.metrics ?? {
+    inputTokens: 0,
+    outputTokens: 0,
+    toolCalls: toolCallsSummary,
+  };
+
   return {
     campaignId: input.campaignId,
     characterName: campaign.characterName,
@@ -42,6 +64,9 @@ export const handler = async (input: FormatInput): Promise<FormattedResponse> =>
     activeEffects: activeEffectNames,
     location: campaign.currentLocation,
     diceRolls,
+    workflowTrace: input.workflowTrace ?? [],
+    logLines: input.logLines ?? [],
+    metrics,
     leveledUp,
     newLevel,
     questUpdate: dmOutput.questUpdate,

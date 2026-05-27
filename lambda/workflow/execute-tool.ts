@@ -280,6 +280,11 @@ async function updateQuestLog(args: Record<string, unknown>, campaign: Campaign)
 
 // Main handler
 export const handler = async (input: ToolInput): Promise<{ result: ToolResult }> => {
+  // DEMO-ONLY: force a failure to trigger the retry animation in the UI
+  if (process.env.FORCE_TOOL_FAILURE === "true") {
+    throw new Error("DemoForcedFailure: failure injection active");
+  }
+
   const { campaignId, turnId, toolName, toolArgs } = input;
   const idempotencyKey = makeIdempotencyKey(campaignId, turnId, toolName, String(toolArgs.purpose ?? toolName));
 

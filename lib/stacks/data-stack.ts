@@ -17,7 +17,9 @@ export class DataStack extends cdk.Stack {
       partitionKey: { name: "campaignId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: "ttl",
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 

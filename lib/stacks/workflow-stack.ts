@@ -20,6 +20,7 @@ export interface WorkflowStackProps extends cdk.StackProps {
 
 export class WorkflowStack extends cdk.Stack {
   public readonly dungeonControllerFunction: lambda.Function;
+  public readonly executeToolFunction: lambda.Function;
   public readonly stateMachine: sfn.StateMachine;
   public readonly dlq: sqs.Queue;
 
@@ -117,7 +118,7 @@ export class WorkflowStack extends cdk.Stack {
       environment: commonEnv,
     });
 
-    // execute-tool Lambda
+    // execute-tool Lambda (also exposed as public for demo failure injection)
     const executeToolFn = new lambdaNodejs.NodejsFunction(this, "ExecuteTool", {
       ...commonLambdaProps,
       functionName: "neon-scratch-execute-tool",
@@ -127,6 +128,7 @@ export class WorkflowStack extends cdk.Stack {
     });
     props.campaignsTable.grantReadWriteData(executeToolFn);
     props.toolResultsTable.grantReadWriteData(executeToolFn);
+    this.executeToolFunction = executeToolFn;
 
     // persist-campaign Lambda
     const persistCampaignFn = new lambdaNodejs.NodejsFunction(this, "PersistCampaign", {

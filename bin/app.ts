@@ -5,6 +5,7 @@ import { DataStack } from "../lib/stacks/data-stack";
 import { KnowledgeBaseStack } from "../lib/stacks/knowledge-base-stack";
 import { WorkflowStack } from "../lib/stacks/workflow-stack";
 import { ObservabilityStack } from "../lib/stacks/observability-stack";
+import { ApiStack } from "../lib/stacks/api-stack";
 
 const app = new cdk.App();
 
@@ -34,5 +35,12 @@ const obsStack = new ObservabilityStack(app, "NeonScratchObservability", {
   dlq: workflowStack.dlq,
 });
 obsStack.addDependency(workflowStack);
+
+const apiStack = new ApiStack(app, "NeonScratchApi", {
+  env,
+  dungeonControllerFunction: workflowStack.dungeonControllerFunction,
+  executeToolFunctionName: workflowStack.executeToolFunction.functionName,
+});
+apiStack.addDependency(workflowStack);
 
 app.synth();

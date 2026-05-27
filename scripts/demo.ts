@@ -222,7 +222,7 @@ async function sendAction(actionText?: string): Promise<void> {
   }
   if (result.gameOver) {
     const icon = result.gameOverReason === "victory" ? "🏆" : "💀";
-    console.log(`\n${C.bright}${icon} GAME OVER: ${result.gameOverReason?.toUpperCase()}${C.reset}`);
+    console.log(`\n${C.bright}${icon} GAME OVER: ${(result.gameOverReason as string | undefined)?.toUpperCase()}${C.reset}`);
     saveState({});
   }
 

@@ -143,6 +143,33 @@ export interface ToolResult {
   result: DiceRollResult | DamageResult | InventoryResult | XpResult | LocationResult | EffectResult | SpecialAbilityResult | QuestLogResult;
 }
 
+export type WorkflowStepStatus = "pending" | "running" | "done" | "failed" | "retrying";
+
+export interface WorkflowStep {
+  name: string;
+  label: string;
+  service: string;
+  status: WorkflowStepStatus;
+  durationMs?: number;
+  retryAttempt?: number;
+  maxRetries?: number;
+}
+
+export interface LogLine {
+  timestamp: string;
+  lambdaName: string;
+  durationMs: number;
+  success: boolean;
+  errorType?: string;
+  extras?: Record<string, string | number>;
+}
+
+export interface TurnMetrics {
+  inputTokens: number;
+  outputTokens: number;
+  toolCalls: string[];
+}
+
 export interface FormattedResponse {
   campaignId: string;
   characterName: string;
@@ -153,6 +180,9 @@ export interface FormattedResponse {
   activeEffects: string[];
   location: string;
   diceRolls: DiceRollResult[];
+  workflowTrace: WorkflowStep[];
+  logLines: LogLine[];
+  metrics: TurnMetrics;
   leveledUp: boolean;
   newLevel?: number;
   questUpdate: string | null;
