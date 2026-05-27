@@ -15,5 +15,5 @@
     "skipLibCheck": true
   },
   "exclude": ["node_modules", "dist", "cdk.out"],
-  "include": ["bin", "lib", "lambda", "scripts", "test"]
+  "include": ["infra", "lambda", "scripts", "test"]
 }

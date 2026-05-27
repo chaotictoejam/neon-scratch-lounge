@@ -17,6 +17,10 @@ export class ApiStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
 
+    const demoBundling: lambdaNodejs.BundlingOptions = {
+      forceDockerBundling: false,
+    };
+
     // DEMO-ONLY Lambdas — inject / clear failure on execute-tool
     // Remove these before any production deployment.
     const injectFailureFn = new lambdaNodejs.NodejsFunction(this, "InjectFailure", {
@@ -25,6 +29,7 @@ export class ApiStack extends cdk.Stack {
       handler: "injectHandler",
       runtime: lambda.Runtime.NODEJS_LATEST,
       timeout: cdk.Duration.seconds(10),
+      bundling: demoBundling,
       environment: {
         EXECUTE_TOOL_FUNCTION_NAME: props.executeToolFunctionName,
       },
@@ -37,20 +42,17 @@ export class ApiStack extends cdk.Stack {
       ],
     }));
 
-    const clearFailureFn = new lambdaNodejs.NodejsFunction(
-      this,
-      "ClearFailure",
-      {
-        functionName: "neon-scratch-demo-clear-failure",
-        entry: path.join(__dirname, "../../lambda/demo/inject-failure.ts"),
-        handler: "clearHandler",
-        runtime: lambda.Runtime.NODEJS_LATEST,
-        timeout: cdk.Duration.seconds(10),
-        environment: {
-          EXECUTE_TOOL_FUNCTION_NAME: props.executeToolFunctionName,
-        },
+    const clearFailureFn = new lambdaNodejs.NodejsFunction(this, "ClearFailure", {
+      functionName: "neon-scratch-demo-clear-failure",
+      entry: path.join(__dirname, "../../lambda/demo/inject-failure.ts"),
+      handler: "clearHandler",
+      runtime: lambda.Runtime.NODEJS_LATEST,
+      timeout: cdk.Duration.seconds(10),
+      bundling: demoBundling,
+      environment: {
+        EXECUTE_TOOL_FUNCTION_NAME: props.executeToolFunctionName,
       },
-    );
+    });
     clearFailureFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["lambda:GetFunctionConfiguration", "lambda:UpdateFunctionConfiguration"],

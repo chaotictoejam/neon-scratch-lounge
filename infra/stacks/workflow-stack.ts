@@ -71,13 +71,14 @@ export class WorkflowStack extends cdk.Stack {
     };
 
     const commonLambdaProps: Partial<lambdaNodejs.NodejsFunctionProps> = {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_LATEST,
       memorySize: 512,
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
         externalModules: [],
         minify: false,
         sourceMap: true,
+        forceDockerBundling: false,
       },
     };
 

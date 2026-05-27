@@ -2,7 +2,7 @@
 
 import * as cdk from "aws-cdk-lib";
 import { Template, Match } from "aws-cdk-lib/assertions";
-import { DataStack } from "../../lib/stacks/data-stack";
+import { DataStack } from "../../infra/stacks/data-stack";
 
 // Lightweight integration test that verifies CDK synth-time guarantees
 // (Step Functions definition, DLQ wiring, X-Ray, env vars)

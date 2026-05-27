@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
-import { DataStack } from "../lib/stacks/data-stack";
-import { KnowledgeBaseStack } from "../lib/stacks/knowledge-base-stack";
-import { WorkflowStack } from "../lib/stacks/workflow-stack";
-import { ObservabilityStack } from "../lib/stacks/observability-stack";
-import { ApiStack } from "../lib/stacks/api-stack";
+import { DataStack } from "../stacks/data-stack";
+import { KnowledgeBaseStack } from "../stacks/knowledge-base-stack";
+import { WorkflowStack } from "../stacks/workflow-stack";
+import { ObservabilityStack } from "../stacks/observability-stack";
+import { ApiStack } from "../stacks/api-stack";
 
 const app = new cdk.App();
 

@@ -49,7 +49,7 @@ Step Functions Express Workflow
   ```bash
   aws iam create-service-linked-role --aws-service-name observability.aoss.amazonaws.com
   ```
-- Node 18+
+- Node 20+
 
 ---
 
@@ -57,7 +57,7 @@ Step Functions Express Workflow
 
 ```bash
 npm install
-npm run build
+cd infra
 cdk deploy --all
 ```
 
@@ -188,7 +188,7 @@ Widgets to call out:
 
 ## Configuration
 
-All tunable parameters live in `cdk.json` under `context.neonScratch`:
+All tunable parameters live in `infra/cdk.json` under `context.neonScratch`:
 
 ```json
 {
@@ -225,12 +225,15 @@ Test files:
 ## File structure
 
 ```
-├── bin/app.ts                          CDK entry point
-├── lib/stacks/
-│   ├── data-stack.ts                  DynamoDB tables
-│   ├── knowledge-base-stack.ts        S3 + OpenSearch + Bedrock KB
-│   ├── workflow-stack.ts              Lambdas + Step Functions + EventBridge
-│   └── observability-stack.ts         CloudWatch dashboard + alarms
+├── infra/                             All CDK infrastructure code
+│   ├── bin/app.ts                     CDK entry point
+│   ├── stacks/
+│   │   ├── data-stack.ts             DynamoDB tables
+│   │   ├── knowledge-base-stack.ts   S3 + OpenSearch + Bedrock KB
+│   │   ├── workflow-stack.ts         Lambdas + Step Functions + EventBridge
+│   │   ├── api-stack.ts              API Gateway + demo endpoints
+│   │   └── observability-stack.ts    CloudWatch dashboard + alarms
+│   └── cdk.json                      CDK config + context variables
 ├── lambda/
 │   ├── shared/                        types.ts, logger.ts, idempotency.ts
 │   ├── dungeon-controller/index.ts    API entry point
@@ -239,7 +242,7 @@ Test files:
 ├── lore/                              locations.json, enemies.json, items.json, classes.json
 ├── scripts/demo.ts                    On-stage demo CLI
 ├── test/                              Unit + CDK synth tests
-├── cdk.json                           CDK config + context variables
+├── package.json                       Node.js project (shared by infra, lambda, scripts, tests)
 └── README.md                          This file
 ```
 
@@ -248,6 +251,7 @@ Test files:
 ## Cleanup
 
 ```bash
+cd infra
 cdk destroy --all
 ```
 
