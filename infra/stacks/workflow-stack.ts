@@ -14,6 +14,7 @@ import * as path from "path";
 export interface WorkflowStackProps extends cdk.StackProps {
   campaignsTable: dynamodb.Table;
   toolResultsTable: dynamodb.Table;
+  knowledgeBaseId?: string;
 }
 
 export class WorkflowStack extends cdk.Stack {
@@ -66,6 +67,7 @@ export class WorkflowStack extends cdk.Stack {
       XP_PER_LEVEL: String(xpPerLevel),
       HISTORY_TRIM_COUNT: String(historyTrimCount),
       CAMPAIGN_TTL_DAYS: String(campaignTtlDays),
+      ...(props.knowledgeBaseId ? { KNOWLEDGE_BASE_ID: props.knowledgeBaseId } : {}),
     };
 
     const commonLambdaProps: Partial<lambdaNodejs.NodejsFunctionProps> = {
@@ -148,6 +150,15 @@ export class WorkflowStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(10),
       environment: commonEnv,
     });
+
+    // Bedrock Knowledge Base retrieve permission (only when KB mode is enabled)
+    if (props.knowledgeBaseId) {
+      retrieveLoreFn.addToRolePolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock:Retrieve"],
+        resources: [`arn:aws:bedrock:${bedrockRegion}:*:knowledge-base/${props.knowledgeBaseId}`],
+      }));
+    }
 
     // Grant read access to retrieve-lore and invoke-dm (read campaigns for context)
     props.campaignsTable.grantReadData(retrieveLoreFn);

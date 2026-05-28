@@ -22,6 +22,7 @@ const workflowStack = new WorkflowStack(app, "NeonScratchWorkflow", {
   env,
   campaignsTable: dataStack.campaignsTable,
   toolResultsTable: dataStack.toolResultsTable,
+  knowledgeBaseId: kbStack.knowledgeBaseId || undefined,
 });
 workflowStack.addDependency(dataStack);
 workflowStack.addDependency(kbStack);

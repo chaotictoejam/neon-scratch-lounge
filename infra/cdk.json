@@ -46,7 +46,8 @@
       "persistCampaignTimeoutSeconds": 10,
       "bedrockRegion": "us-east-1",
       "bedrockModelId": "anthropic.claude-sonnet-4-20250514",
-      "embeddingModelArn": "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
+      "embeddingModelArn": "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1",
+      "useBedrockKnowledgeBase": false
     }
   }
 }

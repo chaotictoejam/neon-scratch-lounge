@@ -12,29 +12,80 @@ The contrast between "cyberpunk cat adventure" and "enterprise distributed syste
 Player Action
      │
      ▼
+API Gateway REST API
+     │  /action POST
+     ▼
 dungeon-controller (Lambda)
-     │  publishes PlayerAction to EventBridge
+     │  publishes PlayerAction to EventBridge (audit trail)
      │  starts Express Workflow synchronously
      ▼
 Step Functions Express Workflow
      │
-     ├── RetrieveLore          → bedrock.retrieve() from Knowledge Base
+     ├── RetrieveLore          → lore context injected before DM call (see modes below)
      ├── InvokeDungeonMaster   → bedrock.InvokeModel (claude-sonnet-4)
      │     └── retry: DMOutputValidationError (MaxAttempts: 3, FULL jitter)
      ├── ValidateAndRoute      → filter ALLOWED_TOOLS
-     ├── ExecuteTools (Map)    → run each tool call
+     ├── ExecuteTools (Map)    → run each tool call in sequence
      │     └── retry: States.TaskFailed (MaxAttempts: 3, FULL jitter)
-     │     └── catch → DLQ + SafeNarrative
-     ├── PersistCampaign       → DynamoDB, summarize if >20 turns
-     └── FormatResponse        → typed response to player
+     │     └── catch → SQS DLQ + SafeNarrative pass state
+     ├── PersistCampaign       → DynamoDB put; bedrock.InvokeModel summarize if history > 20 turns
+     └── FormatResponse        → typed FormattedResponse to player
+          │
+          ▼
+     dungeon-controller returns response synchronously to API Gateway
+```
+
+### RetrieveLore — two modes
+
+**Default (`useBedrockKnowledgeBase: false`)**
+```
+RetrieveLore Lambda
+     └── keyword scoring against bundled JSON (locations + enemies + items + classes, 16 KB total)
+         returns top-5 matching lore entries + guaranteed current location entry
+```
+
+**AOSS mode (`useBedrockKnowledgeBase: true`)**
+```
+RetrieveLore Lambda
+     └── bedrock.retrieve() → Bedrock Knowledge Base
+                                    └── OpenSearch Serverless (VECTORSEARCH collection)
+                                          └── kNN index (HNSW/faiss, titan-embed-text-v1, dim 1536)
+                                                └── S3 bucket (lore JSON files, chunked at 512 tokens)
+```
+
+AOSS mode is deployed by `KnowledgeBaseStack`. A CDK custom resource creates the vector index before the Knowledge Base is created (AOSS data-plane bootstrapping), then triggers a Bedrock ingestion job to embed and index the lore.
+
+### Supporting infrastructure
+
+```
+EventBridge custom bus (neon-scratch-events)
+     └── PlayerAction rule → SFN StartExecution (async, for audit — workflow also runs synchronously)
+
+DynamoDB (on-demand)
+     ├── neon-scratch-campaigns    (campaignId PK, playerId GSI, TTL)
+     └── neon-scratch-tool-results (idempotencyKey PK, TTL)
+
+SQS Dead Letter Queue
+     └── neon-scratch-dungeon-dlq (14-day retention)
+
+CloudWatch
+     ├── Log groups per Lambda (1-week retention)
+     ├── Metric filters (token usage, dice rolls, monsters defeated, active campaigns)
+     ├── Dashboard: NeonScratchLounge
+     └── Alarms (DLQ depth, DM error rate, controller latency p99)
+
+API Gateway (REST)
+     ├── POST /action              → dungeon-controller
+     ├── POST /demo/inject-failure → inject-failure Lambda  (DEMO ONLY)
+     └── POST /demo/clear-failure  → clear-failure Lambda   (DEMO ONLY)
 ```
 
 **Five reliability patterns demonstrated:**
-1. **Bedrock Knowledge Base** — structured lore retrieval via `bedrock.retrieve()`
+1. **Retrieval-Augmented Generation** — lore retrieved and injected as context before every DM call
 2. **Step Functions retries** — exponential backoff with full jitter on DM validation errors
 3. **Dead Letter Queue** — tool failures caught after 3 retries, safe narrative returned
 4. **Idempotency** — tool results cached in DynamoDB with TTL scoped to `campaignId:turnId:toolName`
-5. **Structured observability** — every Lambda emits JSON logs; CloudWatch Insights queries, custom metrics, alarms
+5. **Structured observability** — every Lambda emits one JSON log line per request, queryable in CloudWatch Logs Insights
 
 ---
 
@@ -43,9 +94,9 @@ Step Functions Express Workflow
 - AWS CLI configured with appropriate permissions
 - CDK bootstrapped: `cdk bootstrap`
 - **Bedrock model access enabled** in us-east-1:
-  - `anthropic.claude-sonnet-4-20250514`
-  - `amazon.titan-embed-text-v1`
-- OpenSearch Serverless service-linked role:
+  - `anthropic.claude-sonnet-4-20250514` (required)
+  - `amazon.titan-embed-text-v1` (only if `useBedrockKnowledgeBase: true`)
+- OpenSearch Serverless service-linked role (only if `useBedrockKnowledgeBase: true`):
   ```bash
   aws iam create-service-linked-role --aws-service-name observability.aoss.amazonaws.com
   ```
@@ -60,8 +111,6 @@ npm install
 cd infra
 cdk deploy --all
 ```
-
-Wait **3-5 minutes** for the Bedrock Knowledge Base ingestion job to complete after deploy. The CDK custom resource fires `startIngestionJob` automatically — you can watch progress in the Bedrock console under Knowledge Bases.
 
 ---
 
@@ -257,7 +306,7 @@ Test files:
 │   ├── bin/app.ts                     CDK entry point
 │   ├── stacks/
 │   │   ├── data-stack.ts             DynamoDB tables
-│   │   ├── knowledge-base-stack.ts   S3 + OpenSearch + Bedrock KB
+│   │   ├── knowledge-base-stack.ts   stub (lore is bundled JSON, no AOSS)
 │   │   ├── workflow-stack.ts         Lambdas + Step Functions + EventBridge
 │   │   ├── api-stack.ts              API Gateway + demo endpoints
 │   │   └── observability-stack.ts    CloudWatch dashboard + alarms
@@ -273,6 +322,43 @@ Test files:
 ├── package.json                       Node.js project (shared by infra, lambda, scripts, tests)
 └── README.md                          This file
 ```
+
+---
+
+## Cost breakdown
+
+All figures are estimates in USD per month. Bedrock prices used: Claude Sonnet 4 at $3.00/1M input tokens, $15.00/1M output tokens.
+
+| Service | Idle (AOSS) | Idle (no AOSS) | 500 req/mo | 5,000 req/mo |
+|---|---|---|---|---|
+| OpenSearch Serverless | $700.80 | — | — | — |
+| Amazon Bedrock | — | — | ~$6.20 | ~$62.00 |
+| CloudWatch (dashboard + 3 alarms) | $3.33 | $3.33 | $3.33 | $3.33 |
+| Lambda (7 fns × ~400 ms × 512 MB) | — | — | $0.02 | $0.23 |
+| Step Functions Express | — | — | $0.04 | $0.40 |
+| DynamoDB + API GW + EventBridge + SQS | — | — | $0.01 | $0.10 |
+| **Total / month** | **~$704** | **~$3.35** | **~$9.60** | **~$66.06** |
+
+**Notes:**
+- AOSS idle cost is 4 OCUs minimum (2 indexing + 2 search) at $0.24/OCU-hr × 730 hrs
+- The 500 req and 5,000 req columns assume **bundled-JSON mode** (no AOSS, the default)
+- To run AOSS mode, add ~$701 to either request column
+- Bedrock cost per request ≈ $0.012 (1,500 input tokens + 400 output tokens for invoke-dm, plus amortised summarise call every 20 turns)
+- Bedrock pricing varies by region — verify at the [AWS Bedrock pricing page](https://aws.amazon.com/bedrock/pricing/) before budgeting
+
+### Switching between modes
+
+**Default (bundled JSON)** — no AOSS, no setup beyond CDK deploy:
+```json
+// infra/cdk.json
+"neonScratch": { "useBedrockKnowledgeBase": false }
+```
+
+**AOSS + Bedrock Knowledge Base** — semantic vector search, ~$701/month idle:
+```json
+"neonScratch": { "useBedrockKnowledgeBase": true }
+```
+Also requires `amazon.titan-embed-text-v1` model access in Bedrock console. After `cdk deploy`, wait 3–5 minutes for the ingestion job to complete before the KB returns results.
 
 ---
 
