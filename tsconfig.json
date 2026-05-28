@@ -12,7 +12,9 @@
     "outDir": "./dist",
     "rootDir": ".",
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node", "jest"]
   },
   "exclude": ["node_modules", "dist", "cdk.out"],
   "include": ["infra", "lambda", "scripts", "test"]

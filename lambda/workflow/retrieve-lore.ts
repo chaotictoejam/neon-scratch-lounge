@@ -1,60 +1,64 @@
-import { BedrockAgentRuntimeClient, RetrieveCommand } from "@aws-sdk/client-bedrock-agent-runtime";
 import { WorkflowInput, LoreChunk } from "../shared/types";
 import { log } from "../shared/logger";
 
-const client = new BedrockAgentRuntimeClient({ region: process.env.BEDROCK_REGION ?? "us-east-1" });
-const KNOWLEDGE_BASE_ID = process.env.KNOWLEDGE_BASE_ID!;
+// Lore is bundled directly — 16KB total, no vector store needed.
+import locations from "../../lore/locations.json";
+import enemies from "../../lore/enemies.json";
+import items from "../../lore/items.json";
+import classes from "../../lore/classes.json";
 
-const LOCATION_NAMES = ["NeonScratchLounge", "ChromeAlley", "RoombaCoreTower", "NightMarket", "SewersOfForgetfulness"];
-const ENEMY_NAMES = ["RoombaDrone", "LaserGangMember", "MutantRat", "EliteRoombaDrone", "VacuumDemon", "CEORoomba"];
-const ITEM_NAMES = ["HackingClaws", "LaserPointerMk2", "AncientCatnip", "MysteryCanOfTuna", "NeonScratchCoat", "DroneCore", "MasterHackingKey"];
+type LoreEntry = { id: string; type?: string; [key: string]: unknown };
 
-function buildQuery(action: string, currentLocation: string, campaign: WorkflowInput["campaign"]): string {
-  const keywords: string[] = [currentLocation];
+const ALL_LORE: LoreEntry[] = [
+  ...(locations as LoreEntry[]),
+  ...(enemies as LoreEntry[]),
+  ...(items as LoreEntry[]),
+  ...(classes as LoreEntry[]),
+];
 
-  for (const loc of LOCATION_NAMES) {
-    if (action.toLowerCase().includes(loc.toLowerCase())) keywords.push(loc);
-  }
-  for (const enemy of ENEMY_NAMES) {
-    if (action.toLowerCase().includes(enemy.toLowerCase())) keywords.push(enemy);
-  }
-  for (const item of ITEM_NAMES) {
-    if (action.toLowerCase().includes(item.toLowerCase())) keywords.push(item);
-  }
-  // Also include inventory items for context
-  for (const invItem of campaign.inventory.slice(0, 3)) {
-    keywords.push(invItem);
-  }
+function scoreEntry(entry: LoreEntry, keywords: string[]): number {
+  const text = JSON.stringify(entry).toLowerCase();
+  return keywords.reduce((score, kw) => score + (text.includes(kw.toLowerCase()) ? 1 : 0), 0);
+}
 
-  const uniqueKeywords = [...new Set(keywords)];
-  return `${action} ${uniqueKeywords.join(" ")}`.trim();
+function buildKeywords(action: string, currentLocation: string, inventory: string[]): string[] {
+  return [
+    currentLocation,
+    ...action.toLowerCase().split(/\s+/).filter((w) => w.length > 3),
+    ...inventory.slice(0, 3),
+  ].filter(Boolean);
 }
 
 export const handler = async (input: WorkflowInput): Promise<WorkflowInput & { loreChunks: LoreChunk[] }> => {
   const start = Date.now();
-  const query = buildQuery(input.action, input.campaign.currentLocation, input.campaign);
+  const { action, campaign } = input;
+  const keywords = buildKeywords(action, campaign.currentLocation, campaign.inventory);
 
-  const response = await client.send(new RetrieveCommand({
-    knowledgeBaseId: KNOWLEDGE_BASE_ID,
-    retrievalQuery: { text: query },
-    retrievalConfiguration: {
-      vectorSearchConfiguration: { numberOfResults: 5 },
-    },
+  // Score and rank every lore entry, return the top 5 relevant ones
+  const scored = ALL_LORE
+    .map((entry) => ({ entry, score: scoreEntry(entry, keywords) }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  // Always include the current location even if it scores 0
+  const hasCurrentLocation = scored.some(({ entry }) => entry.id === campaign.currentLocation);
+  if (!hasCurrentLocation) {
+    const locationEntry = ALL_LORE.find((e) => e.id === campaign.currentLocation);
+    if (locationEntry) scored.unshift({ entry: locationEntry, score: 1 });
+  }
+
+  const loreChunks: LoreChunk[] = scored.map(({ entry, score }) => ({
+    content: JSON.stringify(entry),
+    score,
   }));
 
-  const loreChunks: LoreChunk[] = (response.retrievalResults ?? []).map((r) => ({
-    content: r.content?.text ?? "",
-    score: r.score ?? 0,
-    location: r.location?.s3Location?.uri,
-  }));
-
-  const latencyMs = Date.now() - start;
   log({
     requestId: input.correlationId,
     campaignId: input.campaignId,
-    query,
+    keywords,
     chunksRetrieved: loreChunks.length,
-    latencyMs,
+    latencyMs: Date.now() - start,
   });
 
   return { ...input, loreChunks };

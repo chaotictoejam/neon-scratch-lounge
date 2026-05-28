@@ -1,10 +1,14 @@
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
-import { WorkflowInput, DMOutput, Campaign } from "../shared/types";
-import { log } from "../shared/logger";
+import { WorkflowInput, DMOutput, Campaign, ConversationTurn } from "../shared/types";
+import { log, logError } from "../shared/logger";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const bedrock = new BedrockRuntimeClient({ region: process.env.BEDROCK_REGION ?? "us-east-1" });
+
 const CAMPAIGNS_TABLE = process.env.CAMPAIGNS_TABLE!;
+const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID ?? "anthropic.claude-sonnet-4-20250514";
 const MAX_CONVERSATION_HISTORY = parseInt(process.env.MAX_CONVERSATION_HISTORY ?? "20", 10);
 const HISTORY_TRIM_COUNT = parseInt(process.env.HISTORY_TRIM_COUNT ?? "5", 10);
 const CAMPAIGN_TTL_DAYS = parseInt(process.env.CAMPAIGN_TTL_DAYS ?? "30", 10);
@@ -16,7 +20,31 @@ type PersistInput = WorkflowInput & {
   loreChunks: unknown[];
 };
 
-function generateSummary(campaign: Campaign): string {
+async function summarize(campaign: Campaign, history: ConversationTurn[]): Promise<string> {
+  const historyText = history.map((t) => `${t.role}: ${t.content}`).join("\n");
+
+  const requestBody = {
+    anthropic_version: "bedrock-2023-05-31",
+    max_tokens: 256,
+    system: "You are summarizing a cyberpunk cat RPG campaign for long-term memory. Be concise and focus on plot-relevant facts, character state, and completed objectives. Never break the game world fiction.",
+    messages: [{
+      role: "user",
+      content: `Summarize this campaign history in 3-4 sentences, preserving key facts about ${campaign.characterName}'s journey, current objectives, and important discoveries:\n\n${historyText}`,
+    }],
+  };
+
+  const response = await bedrock.send(new InvokeModelCommand({
+    modelId: BEDROCK_MODEL_ID,
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify(requestBody),
+  }));
+
+  const body = JSON.parse(new TextDecoder().decode(response.body));
+  return body.content?.[0]?.text ?? fallbackSummary(campaign);
+}
+
+function fallbackSummary(campaign: Campaign): string {
   const recentItems = campaign.inventory.slice(-3).join(", ") || "nothing of note";
   const lastQuest = campaign.questLog[campaign.questLog.length - 1] ?? "No active quests";
   return `Operative ${campaign.characterName}, a ${campaign.characterClass}, has survived ${campaign.turnsPlayed} turns in Neo-Pawsburg. They have neutralised ${campaign.monstersDefeated} threats, accumulated ${campaign.playerStats.gold} CreditChips, and currently operate from ${campaign.currentLocation} at ${campaign.playerStats.hp}/${campaign.playerStats.maxHp} HP. Recent acquisitions: ${recentItems}. Active quests: ${lastQuest}`;
@@ -30,7 +58,7 @@ export const handler = async (input: PersistInput): Promise<PersistInput> => {
   const campaign = result.Item as Campaign;
 
   // Append this turn to conversation history
-  const newHistory = [
+  const newHistory: ConversationTurn[] = [
     ...campaign.conversationHistory,
     { role: "user", content: action },
     { role: "assistant", content: dmOutput.narrative },
@@ -39,9 +67,14 @@ export const handler = async (input: PersistInput): Promise<PersistInput> => {
   let campaignSummary = campaign.campaignSummary;
   let trimmedHistory = newHistory;
 
-  // Summarize and trim if history exceeds limit
-  if (newHistory.length > MAX_CONVERSATION_HISTORY * 2) {
-    campaignSummary = generateSummary(campaign);
+  // Summarize with Bedrock and trim when history exceeds limit
+  if (newHistory.length > MAX_CONVERSATION_HISTORY) {
+    try {
+      campaignSummary = await summarize(campaign, newHistory);
+    } catch (err) {
+      logError({ campaignId, error: "Bedrock summarize failed, using fallback", detail: String(err) });
+      campaignSummary = fallbackSummary(campaign);
+    }
     trimmedHistory = newHistory.slice(-HISTORY_TRIM_COUNT * 2);
   }
 

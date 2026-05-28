@@ -111,19 +111,35 @@ export const handler = async (event: PlayerAction): Promise<FormattedResponse> =
   }));
 
   const latencyMs = Date.now() - start;
+  const success = sfnResult.status === "SUCCEEDED";
+  const output: FormattedResponse = success
+    ? JSON.parse(sfnResult.output ?? "{}")
+    : {} as FormattedResponse;
 
+  const toolCount = output.metrics?.toolCalls?.length ?? 0;
+  const workflowPath = [
+    "retrieve-lore",
+    "invoke-dm",
+    "validate-route",
+    `execute-tools(${toolCount})`,
+    "persist-campaign",
+    "format-response",
+    ...(output.gameOver ? ["[GAME_OVER]"] : []),
+  ].join(" → ");
+
+  // One structured log line per request — queryable in CloudWatch Logs Insights
   log({
     requestId: correlationId,
-    campaignId,
-    characterClass: campaign.characterClass,
-    action,
-    location: campaign.currentLocation,
-    hp: campaign.playerStats.hp,
-    turnsPlayed: campaign.turnsPlayed,
+    toolName: "dungeon-controller",
+    inputTokens: output.metrics?.inputTokens ?? 0,
+    outputTokens: output.metrics?.outputTokens ?? 0,
     latencyMs,
+    retryCount: output.retryCount ?? 0,
+    workflowPath,
+    success,
   });
 
-  if (sfnResult.status === "FAILED") {
+  if (!success) {
     logError({
       requestId: correlationId,
       campaignId,
@@ -133,6 +149,5 @@ export const handler = async (event: PlayerAction): Promise<FormattedResponse> =
     throw new Error(`Workflow failed: ${sfnResult.error}`);
   }
 
-  const output: FormattedResponse = JSON.parse(sfnResult.output ?? "{}");
   return output;
 };

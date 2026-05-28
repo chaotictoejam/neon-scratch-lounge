@@ -14,8 +14,6 @@ import * as path from "path";
 export interface WorkflowStackProps extends cdk.StackProps {
   campaignsTable: dynamodb.Table;
   toolResultsTable: dynamodb.Table;
-  knowledgeBaseId: string;
-  knowledgeBaseArn: string;
 }
 
 export class WorkflowStack extends cdk.Stack {
@@ -61,7 +59,7 @@ export class WorkflowStack extends cdk.Stack {
       CAMPAIGNS_TABLE: props.campaignsTable.tableName,
       TOOL_RESULTS_TABLE: props.toolResultsTable.tableName,
       TOOL_RESULT_TTL_SECONDS: String(toolResultTtlSeconds),
-      KNOWLEDGE_BASE_ID: props.knowledgeBaseId,
+
       BEDROCK_REGION: bedrockRegion,
       BEDROCK_MODEL_ID: bedrockModelId,
       MAX_CONVERSATION_HISTORY: String(maxConversationHistory),
@@ -74,6 +72,7 @@ export class WorkflowStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_LATEST,
       memorySize: 512,
       tracing: lambda.Tracing.ACTIVE,
+
       bundling: {
         externalModules: [],
         minify: false,
@@ -90,11 +89,6 @@ export class WorkflowStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(timeouts.retrieveLore + 5),
       environment: commonEnv,
     });
-    retrieveLoreFn.addToRolePolicy(new iam.PolicyStatement({
-      effect: iam.Effect.ALLOW,
-      actions: ["bedrock:Retrieve"],
-      resources: [props.knowledgeBaseArn],
-    }));
 
     // invoke-dungeon-master Lambda
     const invokeDmFn = new lambdaNodejs.NodejsFunction(this, "InvokeDungeonMaster", {
@@ -139,7 +133,12 @@ export class WorkflowStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(timeouts.persistCampaign + 5),
       environment: commonEnv,
     });
-    props.campaignsTable.grantWriteData(persistCampaignFn);
+    props.campaignsTable.grantReadWriteData(persistCampaignFn);
+    persistCampaignFn.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ["bedrock:InvokeModel"],
+      resources: [`arn:aws:bedrock:${bedrockRegion}::foundation-model/${bedrockModelId}`],
+    }));
 
     // format-response Lambda
     const formatResponseFn = new lambdaNodejs.NodejsFunction(this, "FormatResponse", {
@@ -165,6 +164,16 @@ export class WorkflowStack extends cdk.Stack {
 
     const invokeDmTask = new tasks.LambdaInvoke(this, "InvokeDungeonMasterTask", {
       lambdaFunction: invokeDmFn,
+      // Inject SFN retry context alongside the existing workflow state
+      payload: sfn.TaskInput.fromObject({
+        "retryCount.$": "$$.State.RetryCount",
+        "campaignId.$": "$.campaignId",
+        "playerId.$": "$.playerId",
+        "action.$": "$.action",
+        "campaign.$": "$.campaign",
+        "correlationId.$": "$.correlationId",
+        "loreChunks.$": "$.loreChunks",
+      }),
       outputPath: "$.Payload",
       retryOnServiceExceptions: false,
       taskTimeout: sfn.Timeout.duration(cdk.Duration.seconds(timeouts.invokeDm)),

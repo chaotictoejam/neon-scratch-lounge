@@ -24,10 +24,29 @@ export class ObservabilityStack extends cdk.Stack {
       displayName: "Neon Scratch Lounge Alerts",
     });
 
-    // Metric filters on dungeon-controller logs
-    const controllerLogGroup = props.dungeonControllerFunction.logGroup;
+    // Create log groups explicitly as CFN resources so metric filters can attach
+    // to them immediately — without this they only exist after first invocation.
+    const controllerLogGroup = new logs.LogGroup(this, "ControllerLogGroup", {
+      logGroupName: `/aws/lambda/${props.dungeonControllerFunction.functionName}`,
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
-    const activeCampaignsFilter = new logs.MetricFilter(this, "ActiveCampaignsFilter", {
+    const executeToolLogGroup = new logs.LogGroup(this, "ExecuteToolLogGroup", {
+      logGroupName: "/aws/lambda/neon-scratch-execute-tool",
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const dmLogGroup = new logs.LogGroup(this, "DmLogGroup", {
+      logGroupName: "/aws/lambda/neon-scratch-invoke-dungeon-master",
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Metric filters — assigned to const to satisfy the linter; the CDK
+    // construct registers itself on the tree so no further reference is needed.
+    new logs.MetricFilter(this, "ActiveCampaignsFilter", {
       logGroup: controllerLogGroup,
       metricNamespace: "NeonScratch",
       metricName: "PlayerActionReceived",
@@ -35,7 +54,7 @@ export class ObservabilityStack extends cdk.Stack {
       metricValue: "1",
     });
 
-    const controllerLatencyFilter = new logs.MetricFilter(this, "ControllerLatencyFilter", {
+    new logs.MetricFilter(this, "ControllerLatencyFilter", {
       logGroup: controllerLogGroup,
       metricNamespace: "NeonScratch",
       metricName: "ControllerLatencyMs",
@@ -43,14 +62,7 @@ export class ObservabilityStack extends cdk.Stack {
       metricValue: "$.latencyMs",
     });
 
-    // Metric filters on execute-tool Lambda logs (via log group name)
-    const executeToolLogGroup = logs.LogGroup.fromLogGroupName(
-      this,
-      "ExecuteToolLogGroup",
-      "/aws/lambda/neon-scratch-execute-tool"
-    );
-
-    const diceRollFilter = new logs.MetricFilter(this, "DiceRollFilter", {
+    new logs.MetricFilter(this, "DiceRollFilter", {
       logGroup: executeToolLogGroup,
       metricNamespace: "NeonScratch",
       metricName: "DiceRollTotal",
@@ -58,7 +70,7 @@ export class ObservabilityStack extends cdk.Stack {
       metricValue: "$.total",
     });
 
-    const monstersDefeatedFilter = new logs.MetricFilter(this, "MonstersDefeatedFilter", {
+    new logs.MetricFilter(this, "MonstersDefeatedFilter", {
       logGroup: executeToolLogGroup,
       metricNamespace: "NeonScratch",
       metricName: "MonstersDefeated",
@@ -66,14 +78,7 @@ export class ObservabilityStack extends cdk.Stack {
       metricValue: "1",
     });
 
-    // Metric filters on invoke-dungeon-master logs
-    const dmLogGroup = logs.LogGroup.fromLogGroupName(
-      this,
-      "DmLogGroup",
-      "/aws/lambda/neon-scratch-invoke-dungeon-master"
-    );
-
-    const tokenUsageFilter = new logs.MetricFilter(this, "TokenUsageFilter", {
+    new logs.MetricFilter(this, "TokenUsageFilter", {
       logGroup: dmLogGroup,
       metricNamespace: "NeonScratch",
       metricName: "BedrockInputTokens",
@@ -81,7 +86,7 @@ export class ObservabilityStack extends cdk.Stack {
       metricValue: "$.inputTokens",
     });
 
-    const dmLatencyFilter = new logs.MetricFilter(this, "DmLatencyFilter", {
+    new logs.MetricFilter(this, "DmLatencyFilter", {
       logGroup: dmLogGroup,
       metricNamespace: "NeonScratch",
       metricName: "DmLatencyMs",

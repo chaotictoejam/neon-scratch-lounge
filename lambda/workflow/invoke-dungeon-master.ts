@@ -36,7 +36,7 @@ export class DMOutputValidationError extends Error {
   }
 }
 
-type DmInput = WorkflowInput & { loreChunks: LoreChunk[] };
+type DmInput = WorkflowInput & { loreChunks: LoreChunk[]; retryCount?: number };
 
 function buildUserMessage(input: DmInput): string {
   const { campaign, action, loreChunks } = input;
@@ -98,7 +98,7 @@ function validateDmOutput(raw: unknown): DMOutput {
   };
 }
 
-export const handler = async (input: DmInput): Promise<DmInput & { dmOutput: DMOutput }> => {
+export const handler = async (input: DmInput): Promise<DmInput & { dmOutput: DMOutput; inputTokens: number; outputTokens: number }> => {
   const start = Date.now();
 
   const messages = [
@@ -149,10 +149,11 @@ export const handler = async (input: DmInput): Promise<DmInput & { dmOutput: DMO
     inputTokens,
     outputTokens,
     latencyMs,
+    retryCount: input.retryCount ?? 0,
     combatOccurred: dmOutput.combatOccurred,
     enemyDefeated: dmOutput.enemyDefeated,
     toolCallCount: dmOutput.toolCalls.length,
   });
 
-  return { ...input, dmOutput };
+  return { ...input, dmOutput, inputTokens, outputTokens };
 };

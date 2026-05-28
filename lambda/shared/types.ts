@@ -190,6 +190,7 @@ export interface FormattedResponse {
   gameOverReason: string | null;
   turnsPlayed: number;
   specialAbilityState: SpecialAbilityState;
+  retryCount: number;
 }
 
 export const CLASS_STARTING_STATS: Record<CharacterClass, PlayerStats> = {

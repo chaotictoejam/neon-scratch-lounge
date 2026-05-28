@@ -5,7 +5,10 @@ type FormatInput = WorkflowInput & {
   toolResults: { result: ToolResult }[];
   validatedToolCalls: unknown[];
   loreChunks: unknown[];
-  // Populated by the dungeon-controller after SFN execution completes
+  // Forwarded from invoke-dungeon-master through SFN state
+  inputTokens?: number;
+  outputTokens?: number;
+  retryCount?: number;
   workflowTrace?: WorkflowStep[];
   logLines?: LogLine[];
   metrics?: TurnMetrics;
@@ -48,9 +51,9 @@ export const handler = async (input: FormatInput): Promise<FormattedResponse> =>
     return [...acc, name];
   }, []);
 
-  const metrics: TurnMetrics = input.metrics ?? {
-    inputTokens: 0,
-    outputTokens: 0,
+  const metrics: TurnMetrics = {
+    inputTokens: input.inputTokens ?? input.metrics?.inputTokens ?? 0,
+    outputTokens: input.outputTokens ?? input.metrics?.outputTokens ?? 0,
     toolCalls: toolCallsSummary,
   };
 
@@ -74,5 +77,6 @@ export const handler = async (input: FormatInput): Promise<FormattedResponse> =>
     gameOverReason: dmOutput.gameOverReason,
     turnsPlayed: campaign.turnsPlayed,
     specialAbilityState: campaign.specialAbilityState,
+    retryCount: input.retryCount ?? 0,
   };
 };
