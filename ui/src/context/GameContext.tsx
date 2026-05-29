@@ -1,6 +1,49 @@
-import { createContext, useContext, useReducer, useCallback, ReactNode } from "react";
+import { createContext, useContext, useReducer, useCallback, useEffect, ReactNode } from "react";
 import { GameState, GameAction, ApiTurnResponse, CharacterClass, NarrativeEntry } from "../types";
 import { v4 as uuidv4 } from "../utils/uuid";
+
+const SAVE_KEY = "neon-scratch-save";
+
+type PersistedState = Pick<GameState,
+  | "campaignId" | "characterName" | "characterClass" | "playerStats"
+  | "inventory" | "activeEffects" | "location" | "narrativeHistory"
+  | "turnsPlayed" | "gameOver" | "gameOverReason"
+>;
+
+function loadPersistedState(): Partial<GameState> {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as PersistedState;
+  } catch {
+    return {};
+  }
+}
+
+function persistState(state: GameState): void {
+  try {
+    if (!state.campaignId) {
+      localStorage.removeItem(SAVE_KEY);
+      return;
+    }
+    const toSave: PersistedState = {
+      campaignId: state.campaignId,
+      characterName: state.characterName,
+      characterClass: state.characterClass,
+      playerStats: state.playerStats,
+      inventory: state.inventory,
+      activeEffects: state.activeEffects,
+      location: state.location,
+      narrativeHistory: state.narrativeHistory,
+      turnsPlayed: state.turnsPlayed,
+      gameOver: state.gameOver,
+      gameOverReason: state.gameOverReason,
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(toSave));
+  } catch {
+    // localStorage unavailable (private browsing limits, etc.)
+  }
+}
 
 const initialState: GameState = {
   campaignId: null,
@@ -85,7 +128,17 @@ interface GameContextValue {
 const GameContext = createContext<GameContextValue | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(gameReducer, initialState);
+  const [state, dispatch] = useReducer(gameReducer, undefined, () => ({
+    ...initialState,
+    ...loadPersistedState(),
+  }));
+
+  // Persist game state to localStorage after every turn completes
+  useEffect(() => {
+    if (!state.isProcessing) {
+      persistState(state);
+    }
+  }, [state]);
 
   const applyTurnResponse = useCallback((response: ApiTurnResponse) => {
     dispatch({ type: "TURN_COMPLETE", response });

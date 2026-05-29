@@ -9,15 +9,28 @@ import { WorkflowTrace } from "./components/MechanicsPanel/WorkflowTrace";
 import { LogStream } from "./components/MechanicsPanel/LogStream";
 import { MetricsStrip } from "./components/MechanicsPanel/MetricsStrip";
 import { ClassSelectorModal } from "./components/ClassSelector/ClassSelectorModal";
+import { ContinueGameModal } from "./components/ClassSelector/ContinueGameModal";
 import { useWorkflowAnimation } from "./hooks/useWorkflowAnimation";
 import { useGame } from "./context/GameContext";
 
 function AppInner() {
-  const { state } = useGame();
-  // Open class selector immediately on first load — no campaignId means nothing is playable
+  const { state, dispatch } = useGame();
+
+  // If there's a saved campaign on load, ask to continue or start fresh
+  const [showContinueModal, setShowContinueModal] = useState(!!state.campaignId);
   const [showClassSelector, setShowClassSelector] = useState(!state.campaignId);
 
   useWorkflowAnimation(state.isProcessing);
+
+  const handleContinue = () => setShowContinueModal(false);
+
+  const handleNewGameFromContinue = () => {
+    setShowContinueModal(false);
+    dispatch({ type: "RESET" });
+    setShowClassSelector(true);
+  };
+
+  const handleNewGame = () => setShowClassSelector(true);
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0f] text-[#c8ccd4] font-mono overflow-hidden">
@@ -26,7 +39,7 @@ function AppInner() {
       <div className="flex flex-1 min-h-0">
         {/* Game Panel — 55% */}
         <div className="flex flex-col gap-2 p-3 overflow-hidden" style={{ width: "55%" }}>
-          <CharacterHUD onNewGame={() => setShowClassSelector(true)} />
+          <CharacterHUD onNewGame={handleNewGame} />
           <DiceRollDisplay />
           <NarrativeDisplay />
           <InventoryBar />
@@ -50,11 +63,18 @@ function AppInner() {
         </div>
       </div>
 
-      {showClassSelector && (
+      {showContinueModal && (
+        <ContinueGameModal
+          onContinue={handleContinue}
+          onNewGame={handleNewGameFromContinue}
+        />
+      )}
+
+      {!showContinueModal && showClassSelector && (
         <ClassSelectorModal onClose={() => setShowClassSelector(false)} />
       )}
 
-      {state.gameOver && (
+      {!showContinueModal && state.gameOver && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/85 backdrop-blur-sm">
           <div className="border border-[#ff00aa]/60 rounded-lg bg-[#0a0a0f] p-8 text-center max-w-sm glow-pink">
             <div className="text-4xl mb-3">
