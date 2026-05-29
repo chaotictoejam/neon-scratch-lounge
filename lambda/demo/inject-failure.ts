@@ -9,17 +9,22 @@ import { LambdaClient, GetFunctionConfigurationCommand, UpdateFunctionConfigurat
 const lambda = new LambdaClient({});
 const EXECUTE_TOOL_FN = process.env.EXECUTE_TOOL_FUNCTION_NAME!;
 
-export const injectHandler = async (): Promise<{ statusCode: number; body: string }> => {
+const HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+};
+
+export const injectHandler = async (): Promise<{ statusCode: number; headers: typeof HEADERS; body: string }> => {
   const config = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: EXECUTE_TOOL_FN }));
   const env = config.Environment?.Variables ?? {};
   await lambda.send(new UpdateFunctionConfigurationCommand({
     FunctionName: EXECUTE_TOOL_FN,
     Environment: { Variables: { ...env, FORCE_TOOL_FAILURE: "true" } },
   }));
-  return { statusCode: 200, body: JSON.stringify({ injected: true }) };
+  return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ injected: true }) };
 };
 
-export const clearHandler = async (): Promise<{ statusCode: number; body: string }> => {
+export const clearHandler = async (): Promise<{ statusCode: number; headers: typeof HEADERS; body: string }> => {
   const config = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: EXECUTE_TOOL_FN }));
   const env = { ...(config.Environment?.Variables ?? {}) };
   delete env.FORCE_TOOL_FAILURE;
@@ -27,5 +32,5 @@ export const clearHandler = async (): Promise<{ statusCode: number; body: string
     FunctionName: EXECUTE_TOOL_FN,
     Environment: { Variables: env },
   }));
-  return { statusCode: 200, body: JSON.stringify({ cleared: true }) };
+  return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ cleared: true }) };
 };

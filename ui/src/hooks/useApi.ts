@@ -26,7 +26,7 @@ export function useApi() {
     if (!mechState.failureInjectionActive) return;
     const id = setTimeout(() => {
       mechDispatch({ type: "TOGGLE_FAILURE_INJECTION" });
-      clearFailure().catch(() => {});
+      clearFailure().catch((e) => console.warn("Failed to clear failure injection:", e));
     }, 3000);
     return () => clearTimeout(id);
   }, [mechState.failureInjectionActive, mechDispatch]);
@@ -45,7 +45,7 @@ export function useApi() {
 
       try {
         if (mechState.failureInjectionActive) {
-          await injectFailure().catch(() => {});
+          await injectFailure().catch((e) => console.warn("Failed to inject failure:", e));
           mechDispatch({ type: "INCREMENT_DLQ" });
           // Dramatic retry animation for ExecuteTools
           mechDispatch({ type: "STEP_RETRY", stepName: "ExecuteTools", attempt: 1, maxRetries: 3 });

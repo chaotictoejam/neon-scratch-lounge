@@ -1,6 +1,6 @@
 import { ApiTurnResponse, CharacterClass } from "../types";
 
-const BASE_URL = import.meta.env.VITE_API_GATEWAY_URL as string;
+const BASE_URL = (import.meta.env.VITE_API_GATEWAY_URL as string ?? "").replace(/\/$/, "");
 const PLAYER_ID = (import.meta.env.VITE_PLAYER_ID as string) ?? "demo-player-aws-summit";
 
 export async function sendAction(params: {
@@ -30,9 +30,11 @@ export async function sendAction(params: {
 }
 
 export async function injectFailure(): Promise<void> {
-  await fetch(`${BASE_URL}/demo/inject-failure`, { method: "POST" });
+  const res = await fetch(`${BASE_URL}/demo/inject-failure`, { method: "POST" });
+  if (!res.ok) throw new Error(`inject-failure failed: ${res.status}`);
 }
 
 export async function clearFailure(): Promise<void> {
-  await fetch(`${BASE_URL}/demo/clear-failure`, { method: "POST" });
+  const res = await fetch(`${BASE_URL}/demo/clear-failure`, { method: "POST" });
+  if (!res.ok) throw new Error(`clear-failure failed: ${res.status}`);
 }
