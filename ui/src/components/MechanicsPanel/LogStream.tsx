@@ -1,42 +1,51 @@
 import { useRef, useEffect } from "react";
 import { useMechanics } from "../../context/MechanicsContext";
-import { LogLine } from "../../types";
+import { CwlLogRow } from "../../types";
 import { latencyColor } from "../../utils/formatters";
 
-function LogLineRow({ line, idx }: { line: LogLine; idx: number }) {
-  const latClass = latencyColor(line.durationMs);
-  const extras = line.extras
-    ? Object.entries(line.extras)
-        .map(([k, v]) => `${k}:${v}`)
-        .join("  ")
-    : "";
+function CwlRow({ row, idx }: { row: CwlLogRow; idx: number }) {
+  const ts = row["@timestamp"]?.slice(11, 23) ?? "";
+  const success = row.success === "true" || row.success === "1";
+  const latMs = row.latencyMs ? Number(row.latencyMs) : null;
+  const latClass = latMs !== null ? latencyColor(latMs) : "text-[#6644aa]/60";
+
+  // Infer source lambda from which structured fields are present
+  const source = row.toolName
+    ? "exec-tool"
+    : row.inputTokens
+      ? "invoke-dm"
+      : "controller";
 
   return (
     <div
       className={`flex items-baseline gap-2 text-xs font-mono log-line-enter whitespace-nowrap ${
-        line.success ? "" : "text-red-400"
+        success ? "" : "text-red-400"
       }`}
-      style={{ animationDelay: `${idx * 30}ms` }}
+      style={{ animationDelay: `${idx * 20}ms` }}
     >
-      <span className="text-[#6644aa]/70 shrink-0">{line.timestamp}</span>
-      <span
-        className={`shrink-0 w-32 truncate ${
-          line.success ? "text-[#c8ccd4]/80" : "text-red-400"
-        }`}
-      >
-        {line.lambdaName}
+      <span className="text-[#6644aa]/70 shrink-0 w-28">{ts}</span>
+      <span className={`shrink-0 w-20 truncate ${success ? "text-[#c8ccd4]/70" : "text-red-400"}`}>
+        {source}
       </span>
-      <span className={`${latClass} shrink-0 w-14 text-right`}>
-        {line.durationMs}ms
-      </span>
-      <span className={line.success ? "text-[#00ffcc]/70 shrink-0" : "text-red-400 shrink-0"}>
-        {line.success ? "✓" : "✗"}
-      </span>
-      {line.errorType && (
-        <span className="text-red-400 shrink-0">{line.errorType}</span>
+      {latMs !== null && (
+        <span className={`${latClass} shrink-0 w-14 text-right`}>{latMs}ms</span>
       )}
-      {extras && (
-        <span className="text-[#6644aa]/70">{extras}</span>
+      <span className={success ? "text-[#00ffcc]/70 shrink-0" : "text-red-400 shrink-0"}>
+        {success ? "✓" : "✗"}
+      </span>
+      {row.toolName && (
+        <span className="text-[#ffaa00]/80 shrink-0">{row.toolName}</span>
+      )}
+      {row.toolName === "roll-dice" && row.diceResult && (
+        <span className="text-[#00ffcc] shrink-0">🎲{row.diceResult}</span>
+      )}
+      {!row.toolName && row.inputTokens && (
+        <span className="text-[#6644aa]/80">
+          in:{row.inputTokens} out:{row.outputTokens}
+        </span>
+      )}
+      {row.retryCount && row.retryCount !== "0" && (
+        <span className="text-[#ff00aa]/80 shrink-0">retry:{row.retryCount}</span>
       )}
     </div>
   );
@@ -50,15 +59,20 @@ export function LogStream() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [state.logLines.length]);
+  }, [state.cwlLogs.length]);
 
   return (
     <div className="border border-[#ff00aa]/20 rounded bg-[#0d0d18] p-3 flex flex-col min-h-0">
       <div className="flex items-center gap-2 mb-2 pb-1 border-b border-[#1a1a2e] shrink-0">
         <span className="text-[#ff00aa] text-xs font-bold tracking-wider uppercase text-glow-pink">
-          Live Telemetry
+          CloudWatch Logs
         </span>
-        <span className="text-[#1a1a2e]">────────────────────────</span>
+        <span className="text-[#1a1a2e]">───────────────────────</span>
+        {state.cwlLogs.length > 0 && (
+          <span className="text-[#6644aa]/60 text-[10px] ml-auto shrink-0">
+            {state.cwlLogs.length} events
+          </span>
+        )}
       </div>
 
       <div
@@ -66,11 +80,11 @@ export function LogStream() {
         className="overflow-y-auto flex-1 space-y-0.5 min-h-0"
         style={{ maxHeight: "160px" }}
       >
-        {state.logLines.length === 0 && (
+        {state.cwlLogs.length === 0 && (
           <p className="text-[#6644aa]/40 text-xs">Awaiting Lambda invocations...</p>
         )}
-        {state.logLines.map((line, i) => (
-          <LogLineRow key={i} line={line} idx={i} />
+        {state.cwlLogs.map((row, i) => (
+          <CwlRow key={i} row={row} idx={i} />
         ))}
       </div>
     </div>

@@ -42,6 +42,20 @@ export class ApiStack extends cdk.Stack {
       ],
     }));
 
+    const fetchLogsFn = new lambdaNodejs.NodejsFunction(this, "FetchLogs", {
+      functionName: "neon-scratch-demo-fetch-logs",
+      entry: path.join(__dirname, "../../lambda/demo/fetch-logs.ts"),
+      handler: "handler",
+      runtime: lambda.Runtime.NODEJS_LATEST,
+      timeout: cdk.Duration.seconds(15),
+      bundling: demoBundling,
+    });
+    fetchLogsFn.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ["logs:StartQuery", "logs:GetQueryResults"],
+      resources: ["*"],
+    }));
+
     const clearFailureFn = new lambdaNodejs.NodejsFunction(this, "ClearFailure", {
       functionName: "neon-scratch-demo-clear-failure",
       entry: path.join(__dirname, "../../lambda/demo/inject-failure.ts"),
@@ -99,6 +113,12 @@ export class ApiStack extends cdk.Stack {
     clearResource.addMethod(
       "POST",
       new apigw.LambdaIntegration(clearFailureFn, { proxy: true })
+    );
+
+    const logsResource = demoResource.addResource("logs");
+    logsResource.addMethod(
+      "GET",
+      new apigw.LambdaIntegration(fetchLogsFn, { proxy: true })
     );
 
     this.apiUrl = api.url;

@@ -38,3 +38,9 @@ export async function clearFailure(): Promise<void> {
   const res = await fetch(`${BASE_URL}/demo/clear-failure`, { method: "POST" });
   if (!res.ok) throw new Error(`clear-failure failed: ${res.status}`);
 }
+
+export async function fetchCampaignLogs(campaignId: string): Promise<{ rows: Record<string, string>[] }> {
+  const res = await fetch(`${BASE_URL}/demo/logs?campaignId=${encodeURIComponent(campaignId)}`);
+  if (!res.ok) throw new Error(`fetch-logs failed: ${res.status}`);
+  return res.json();
+}

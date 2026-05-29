@@ -84,9 +84,23 @@ export interface GameState {
   turnsPlayed: number;
 }
 
+export interface CwlLogRow {
+  "@timestamp"?: string;
+  campaignId?: string;
+  latencyMs?: string;
+  toolName?: string;
+  diceResult?: string;
+  inputTokens?: string;
+  outputTokens?: string;
+  success?: string;
+  retryCount?: string;
+  "@message"?: string;
+}
+
 export interface MechanicsState {
   workflowSteps: WorkflowStep[];
   logLines: LogLine[];
+  cwlLogs: CwlLogRow[];
   currentTurnMetrics: TurnMetrics;
   sessionMetrics: SessionMetrics;
   failureInjectionActive: boolean;
@@ -128,6 +142,7 @@ export type MechanicsAction =
   | { type: "STEP_RETRY"; stepName: string; attempt: number; maxRetries: number }
   | { type: "ADD_LOG_LINE"; line: LogLine }
   | { type: "SET_LOG_LINES"; lines: LogLine[] }
+  | { type: "SET_CWL_LOGS"; rows: CwlLogRow[] }
   | { type: "SET_TURN_METRICS"; metrics: TurnMetrics }
   | { type: "INCREMENT_RETRY" }
   | { type: "SET_DLQ_DEPTH"; depth: number }

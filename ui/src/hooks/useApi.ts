@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { useGame } from "../context/GameContext";
 import { useMechanics } from "../context/MechanicsContext";
-import { sendAction, injectFailure, clearFailure } from "../utils/api";
+import { sendAction, injectFailure, clearFailure, fetchCampaignLogs } from "../utils/api";
 import { CharacterClass } from "../types";
 import { v4 as uuidv4 } from "../utils/uuid";
 
@@ -77,6 +77,12 @@ export function useApi() {
         }
 
         gameDispatch({ type: "TURN_COMPLETE", response });
+
+        if (response.campaignId) {
+          fetchCampaignLogs(response.campaignId)
+            .then(({ rows }) => mechDispatch({ type: "SET_CWL_LOGS", rows }))
+            .catch((e) => console.warn("fetchCampaignLogs failed:", e));
+        }
       } catch (err) {
         console.error("Turn failed:", err);
         // Mark current running step as failed

@@ -4,6 +4,7 @@ import { MechanicsState, MechanicsAction, WORKFLOW_STEPS_DEFAULT, WorkflowStep }
 const initialState: MechanicsState = {
   workflowSteps: WORKFLOW_STEPS_DEFAULT.map((s) => ({ ...s })),
   logLines: [],
+  cwlLogs: [],
   currentTurnMetrics: { inputTokens: 0, outputTokens: 0, toolCalls: [] },
   sessionMetrics: { totalInputTokens: 0, totalOutputTokens: 0, retryCount: 0, dlqDepth: 0 },
   failureInjectionActive: false,
@@ -53,6 +54,9 @@ function mechanicsReducer(state: MechanicsState, action: MechanicsAction): Mecha
 
     case "SET_LOG_LINES":
       return { ...state, logLines: action.lines };
+
+    case "SET_CWL_LOGS":
+      return { ...state, cwlLogs: action.rows };
 
     case "SET_TURN_METRICS": {
       const m = action.metrics;
