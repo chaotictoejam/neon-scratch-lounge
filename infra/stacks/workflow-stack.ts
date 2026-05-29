@@ -329,6 +329,7 @@ export class WorkflowStack extends cdk.Stack {
       logGroup: controllerLogGroup,
     });
     props.campaignsTable.grantReadWriteData(this.dungeonControllerFunction);
+    this.stateMachine.grantStartSyncExecution(this.dungeonControllerFunction);
 
     // EventBridge custom bus
     const eventBus = new events.EventBus(this, "NeonScratchEventBus", {
