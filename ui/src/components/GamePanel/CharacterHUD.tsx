@@ -140,6 +140,12 @@ export function CharacterHUD({ onNewGame }: { onNewGame: () => void }) {
               STL:<span className="text-[#c8ccd4] ml-0.5">{stats.stealth}</span>
             </span>
           </div>
+
+          {state.campaignId && (
+            <div className="text-[#1a1a2e] text-[10px] font-mono mt-1 select-all hover:text-[#6644aa]/60 transition-colors" title={state.campaignId}>
+              ID: {state.campaignId}
+            </div>
+          )}
         </>
       )}
 
