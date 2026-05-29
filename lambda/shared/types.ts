@@ -75,6 +75,12 @@ export interface ToolCall {
   toolArgs: Record<string, unknown>;
 }
 
+export interface Combatant {
+  name: string;
+  hp: number;
+  maxHp: number;
+}
+
 export interface DMOutput {
   narrative: string;
   characterName: string;
@@ -83,6 +89,7 @@ export interface DMOutput {
   questUpdate: string | null;
   combatOccurred: boolean;
   enemyDefeated: string | null;
+  combatants: Combatant[];
   gameOver: boolean;
   gameOverReason: "death" | "victory" | null;
   dmInternalNote: string;
@@ -191,6 +198,7 @@ export interface FormattedResponse {
   turnsPlayed: number;
   specialAbilityState: SpecialAbilityState;
   retryCount: number;
+  combatants: Combatant[];
 }
 
 export const CLASS_STARTING_STATS: Record<CharacterClass, PlayerStats> = {

@@ -62,6 +62,7 @@ const initialState: GameState = {
   gameOver: false,
   gameOverReason: null,
   turnsPlayed: 0,
+  combatants: [],
 };
 
 function gameReducer(state: GameState, action: GameAction): GameState {
@@ -90,6 +91,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         location: r.location,
         narrativeHistory: history,
         diceRolls: r.diceRolls ?? [],
+        combatants: r.combatants ?? [],
         leveledUp: r.leveledUp,
         showLevelUp: r.leveledUp,
         gameOver: r.gameOver,

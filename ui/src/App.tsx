@@ -3,6 +3,7 @@ import { Header } from "./components/Header";
 import { CharacterHUD } from "./components/GamePanel/CharacterHUD";
 import { NarrativeDisplay } from "./components/GamePanel/NarrativeDisplay";
 import { DiceRollDisplay } from "./components/GamePanel/DiceRollDisplay";
+import { CombatTracker } from "./components/GamePanel/CombatTracker";
 import { InventoryBar } from "./components/GamePanel/InventoryBar";
 import { ActionInput } from "./components/GamePanel/ActionInput";
 import { WorkflowTrace } from "./components/MechanicsPanel/WorkflowTrace";
@@ -43,6 +44,7 @@ function AppInner() {
         {/* Game Panel — 55% */}
         <div className="flex flex-col gap-2 p-3 overflow-hidden" style={{ width: "55%" }}>
           <CharacterHUD onNewGame={handleNewGame} />
+          <CombatTracker />
           <DiceRollDisplay />
           <NarrativeDisplay />
           <InventoryBar />

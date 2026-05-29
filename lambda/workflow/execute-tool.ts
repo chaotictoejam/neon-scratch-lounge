@@ -135,7 +135,7 @@ async function updateInventory(args: Record<string, unknown>, campaign: Campaign
       const amount = embeddedAmount ? parseInt(embeddedAmount[1], 10) : Number(args.quantity ?? 10);
       gold += amount;
       await patchCampaign(campaign.campaignId, "SET playerStats.gold = :g", { ":g": gold });
-    } else {
+    } else if (!inventory.includes(item)) {
       inventory.push(item);
       await patchCampaign(campaign.campaignId, "SET inventory = :inv", { ":inv": inventory });
     }

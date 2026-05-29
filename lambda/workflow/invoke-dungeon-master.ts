@@ -1,5 +1,5 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
-import { WorkflowInput, LoreChunk, DMOutput, ToolCall } from "../shared/types";
+import { WorkflowInput, LoreChunk, DMOutput, ToolCall, Combatant } from "../shared/types";
 import { log, logError } from "../shared/logger";
 
 const client = new BedrockRuntimeClient({ region: process.env.BEDROCK_REGION ?? "us-east-1" });
@@ -21,6 +21,7 @@ You must respond with valid JSON matching this exact schema:
   "questUpdate": "string or null",
   "combatOccurred": boolean,
   "enemyDefeated": "string (enemy name e.g. 'RoombaCoreDrone') when an enemy dies this turn, otherwise null",
+  "combatants": [{"name": "string", "hp": number, "maxHp": number}],
   "gameOver": boolean,
   "gameOverReason": "death" | "victory" | null,
   "dmInternalNote": "string (debugging note, not shown to player)"
@@ -40,7 +41,8 @@ Available tools:
 
 Always call roll-dice before apply-damage in combat. Always award-xp when enemies are defeated.
 Always include a descriptive "purpose" on every roll-dice call.
-CRITICAL: When an enemy is killed or destroyed this turn, you MUST set enemyDefeated to that enemy's name — never leave it null after a kill.`;
+CRITICAL: When an enemy is killed or destroyed this turn, you MUST set enemyDefeated to that enemy's name — never leave it null after a kill.
+ENEMY TRACKING: Always populate "combatants" with every active enemy this turn: {"name": "RoombaCoreDrone", "hp": 18, "maxHp": 25}. Subtract damage dealt from hp. Remove enemies when hp reaches 0. Use [] when not in combat.`;
 
 export class DMOutputValidationError extends Error {
   constructor(message: string) {
@@ -105,6 +107,7 @@ function validateDmOutput(raw: unknown): DMOutput {
     questUpdate: (obj.questUpdate as string | null) ?? null,
     combatOccurred: Boolean(obj.combatOccurred),
     enemyDefeated: (obj.enemyDefeated as string | null) ?? null,
+    combatants: Array.isArray(obj.combatants) ? obj.combatants as Combatant[] : [],
     gameOver: Boolean(obj.gameOver),
     gameOverReason: (obj.gameOverReason as "death" | "victory" | null) ?? null,
     dmInternalNote: (obj.dmInternalNote as string) ?? "",

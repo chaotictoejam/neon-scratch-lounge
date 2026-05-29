@@ -17,6 +17,12 @@ export interface ActiveEffect {
   turnsRemaining: number;
 }
 
+export interface Combatant {
+  name: string;
+  hp: number;
+  maxHp: number;
+}
+
 export interface DiceRoll {
   rolls: number[];
   modifier: number;
@@ -82,6 +88,7 @@ export interface GameState {
   gameOver: boolean;
   gameOverReason: string | null;
   turnsPlayed: number;
+  combatants: Combatant[];
 }
 
 export interface CwlLogRow {
@@ -124,6 +131,7 @@ export interface ApiTurnResponse {
   gameOver: boolean;
   gameOverReason: string | null;
   turnsPlayed: number;
+  combatants?: Combatant[];
 }
 
 export type GameAction =

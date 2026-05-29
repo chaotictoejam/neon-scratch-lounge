@@ -87,6 +87,7 @@ export const handler = async (input: FormatInput): Promise<FormattedResponse> =>
     turnsPlayed: campaign.turnsPlayed,
     specialAbilityState: campaign.specialAbilityState,
     retryCount: input.retryCount ?? 0,
+    combatants: dmOutput.combatants ?? [],
   };
 
   if (input.startedAt) {
