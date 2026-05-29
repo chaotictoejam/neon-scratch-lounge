@@ -221,6 +221,7 @@ export const KNOWN_LOCATIONS = [
   "RoombaCoreTower",
   "NightMarket",
   "SewersOfForgetfulness",
+  "IndustrialZone",
 ];
 
 export const ALLOWED_TOOLS = [

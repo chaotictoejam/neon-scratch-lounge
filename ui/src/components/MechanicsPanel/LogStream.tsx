@@ -40,6 +40,14 @@ function CwlRow({ row, idx }: { row: CwlLogRow; idx: number }) {
       {row.toolName === "roll-dice" && row.diceResult && (
         <span className="text-[#00ffcc] shrink-0">🎲{row.diceResult}</span>
       )}
+      {row.toolName === "apply-damage" && row.newHp !== undefined && row.previousHp !== undefined && (() => {
+        const prev = Number(row.previousHp);
+        const next = Number(row.newHp);
+        const delta = next - prev;
+        return delta >= 0
+          ? <span className="text-[#00cc88] shrink-0">❤ +{delta} → {next}</span>
+          : <span className="text-[#ff4444] shrink-0">❤ {delta} → {next}</span>;
+      })()}
       {!row.toolName && row.inputTokens && (
         <span className="text-[#6644aa]/80">
           in:{row.inputTokens} out:{row.outputTokens}

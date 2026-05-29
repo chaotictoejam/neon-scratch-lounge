@@ -27,7 +27,7 @@ export const handler = async (event: ProxyEvent) => {
   const startTime = endTime - 7200; // last 2 hours
 
   const queryString = `
-    fields @timestamp, campaignId, latencyMs, toolName, total as diceResult, inputTokens, outputTokens, success, retryCount, @message
+    fields @timestamp, campaignId, latencyMs, toolName, total as diceResult, inputTokens, outputTokens, success, retryCount, newHp, previousHp, @message
     | filter campaignId = "${campaignId.replace(/[^a-zA-Z0-9\-]/g, "")}"
     | sort @timestamp asc
     | limit 100

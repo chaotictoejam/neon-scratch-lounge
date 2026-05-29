@@ -65,6 +65,16 @@ async function applyDamage(args: Record<string, unknown>, campaign: Campaign): P
     return { previousHp: 0, newHp: 0, damageBlocked: 0, nineLivesTrigger: false, isDead: false };
   }
 
+  const previousHp = campaign.playerStats.hp;
+
+  // Negative amount = healing
+  if (rawDamage < 0) {
+    const newHp = Math.min(campaign.playerStats.maxHp, previousHp + Math.abs(rawDamage));
+    await patchCampaign(campaign.campaignId, "SET playerStats.hp = :hp", { ":hp": newHp });
+    log({ toolName: "apply-damage", targetType, rawDamage, actualDamage: rawDamage, damageBlocked: 0, damageType, previousHp, newHp, nineLivesTrigger: false, isDead: false });
+    return { previousHp, newHp, damageBlocked: 0, nineLivesTrigger: false, isDead: false };
+  }
+
   let damageBlocked = 0;
   let actualDamage = rawDamage;
 
@@ -90,7 +100,6 @@ async function applyDamage(args: Record<string, unknown>, campaign: Campaign): P
     damageBlocked += reduction;
   }
 
-  const previousHp = campaign.playerStats.hp;
   let newHp = Math.max(0, previousHp - actualDamage);
   let nineLivesTrigger = false;
 
@@ -150,16 +159,28 @@ async function updateInventory(args: Record<string, unknown>, campaign: Campaign
       await patchCampaign(campaign.campaignId, "SET inventory = :inv", { ":inv": inventory });
     }
   } else if (action === "use") {
+    const ITEM_HP_RESTORE: Record<string, number> = {
+      MysteryCanOfTuna: 40,
+      MediPack: 30,
+      AdvancedMedKit: 60,
+      "Advanced Med-Kit": 60,
+      StandardMedKit: 40,
+      "Standard Med-Kit": 40,
+    };
     const ITEM_EFFECTS: Record<string, string> = {
-      MysteryCanOfTuna: "Restore 40hp",
       AncientCatnip: "Roll 1d6: 1-2 restore 50hp, 3-4 deal 50 damage to random enemy, 5-6 both",
       LaserPointerMk2: "Stun enemy for 1 turn",
     };
-    effectApplied = ITEM_EFFECTS[item] ?? "Unknown effect";
 
-    if (item === "MysteryCanOfTuna") {
-      const newHp = Math.min(campaign.playerStats.maxHp, campaign.playerStats.hp + 40);
+    const restoreAmount = ITEM_HP_RESTORE[item]
+      ?? (/med.?kit|medkit|medikit/i.test(item) ? 40 : 0);
+
+    if (restoreAmount > 0) {
+      const newHp = Math.min(campaign.playerStats.maxHp, campaign.playerStats.hp + restoreAmount);
       await patchCampaign(campaign.campaignId, "SET playerStats.hp = :hp", { ":hp": newHp });
+      effectApplied = `Restored ${restoreAmount}hp`;
+    } else {
+      effectApplied = ITEM_EFFECTS[item] ?? "Unknown effect";
     }
 
     inventory = inventory.filter((i) => i !== item);
@@ -207,10 +228,39 @@ async function awardXp(args: Record<string, unknown>, campaign: Campaign): Promi
   return { previousLevel, newLevel, newXp, leveledUp, statImproved };
 }
 
+function resolveLocation(input: string): string | null {
+  if (KNOWN_LOCATIONS.includes(input)) return input;
+
+  // Normalise: lowercase, strip spaces/punctuation
+  const norm = input.toLowerCase().replace(/[\s\-_,./]+/g, "");
+
+  // Exact normalised match
+  for (const loc of KNOWN_LOCATIONS) {
+    if (norm === loc.toLowerCase()) return loc;
+  }
+
+  // Input contains a known location name (e.g. "Sector Nine, IndustrialZone")
+  for (const loc of KNOWN_LOCATIONS) {
+    if (norm.includes(loc.toLowerCase())) return loc;
+  }
+
+  // Known location name contains a meaningful word from the input (≥5 chars)
+  const words = norm.split(/[^a-z]+/).filter((w) => w.length >= 5);
+  for (const loc of KNOWN_LOCATIONS) {
+    const locNorm = loc.toLowerCase();
+    if (words.some((w) => locNorm.includes(w))) return loc;
+  }
+
+  return null;
+}
+
 async function updateLocation(args: Record<string, unknown>, campaign: Campaign): Promise<LocationResult> {
-  const newLocation = String(args.newLocation ?? "");
-  if (!KNOWN_LOCATIONS.includes(newLocation)) {
-    throw new Error(`Unknown location: ${newLocation}. Valid locations: ${KNOWN_LOCATIONS.join(", ")}`);
+  const raw = String(args.newLocation ?? args.location ?? "").trim();
+  const newLocation = raw ? resolveLocation(raw) : null;
+
+  if (!newLocation) {
+    log({ toolName: "update-location", warning: `Unresolvable location ignored: "${raw}"`, campaignId: campaign.campaignId });
+    return { previousLocation: campaign.currentLocation, newLocation: campaign.currentLocation, locationDescription: "No change" };
   }
 
   const previousLocation = campaign.currentLocation;
@@ -222,6 +272,7 @@ async function updateLocation(args: Record<string, unknown>, campaign: Campaign)
     RoombaCoreTower: "The megacorp HQ. 40 floors of brushed steel. Heavily guarded.",
     NightMarket: "Underground market. Stolen tech and black-market tuna.",
     SewersOfForgetfulness: "Ancient sewers. Smells terrible. Home to things that rejected society.",
+    IndustrialZone: "Rusted warehouses and fabrication plants. Sector Nine gangs run protection here.",
   };
 
   return { previousLocation, newLocation, locationDescription: descriptions[newLocation] ?? newLocation };

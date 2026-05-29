@@ -101,6 +101,8 @@ export interface CwlLogRow {
   outputTokens?: string;
   success?: string;
   retryCount?: string;
+  newHp?: string;
+  previousHp?: string;
   "@message"?: string;
 }
 
