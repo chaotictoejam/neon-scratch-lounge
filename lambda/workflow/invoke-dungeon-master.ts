@@ -29,7 +29,8 @@ You must respond with valid JSON matching this exact schema:
 Available tools:
 - roll-dice: {sides, count, modifier, purpose (REQUIRED — describe what the roll is for, e.g. "attack", "stealth-check", "lockpicking", "damage", "initiative"), statBonus}
 - apply-damage: {amount, source}
-- update-inventory: {action ("add"|"remove"), item}
+- update-inventory: {action ("add"|"remove"|"use"), item, quantity}
+  GOLD RULE: to award gold use action "add", item "CreditChips", quantity <number>. NEVER put a number or description inside the item name (e.g. never "15 CreditChips" or "CreditChips (salvaged)"). item must be exactly "CreditChips" with the amount in quantity.
 - award-xp: {amount, reason}
 - update-location: {location}
 - apply-effect: {effect, turnsRemaining}

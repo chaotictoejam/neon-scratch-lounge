@@ -124,9 +124,15 @@ async function updateInventory(args: Record<string, unknown>, campaign: Campaign
   let gold = campaign.playerStats.gold;
   let effectApplied: string | undefined;
 
+  // Detect any CreditChip award regardless of how the DM formats it
+  // e.g. "CreditChips", "15 CreditChips", "60 CreditChips (salvaged from rat nest)"
+  const creditChipMatch = item.match(/^(\d+)\s+creditchips?/i) ?? item.match(/creditchips?/i);
+  const isCreditChips = !!creditChipMatch;
+
   if (action === "add") {
-    if (item === "CreditChips") {
-      const amount = Number(args.quantity ?? 10);
+    if (isCreditChips) {
+      const embeddedAmount = item.match(/^(\d+)/);
+      const amount = embeddedAmount ? parseInt(embeddedAmount[1], 10) : Number(args.quantity ?? 10);
       gold += amount;
       await patchCampaign(campaign.campaignId, "SET playerStats.gold = :g", { ":g": gold });
     } else {
