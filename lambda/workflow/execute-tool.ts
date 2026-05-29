@@ -140,8 +140,15 @@ async function updateInventory(args: Record<string, unknown>, campaign: Campaign
       await patchCampaign(campaign.campaignId, "SET inventory = :inv", { ":inv": inventory });
     }
   } else if (action === "remove") {
-    inventory = inventory.filter((i) => i !== item);
-    await patchCampaign(campaign.campaignId, "SET inventory = :inv", { ":inv": inventory });
+    if (isCreditChips) {
+      const embeddedAmount = item.match(/^(\d+)/);
+      const amount = embeddedAmount ? parseInt(embeddedAmount[1], 10) : Number(args.quantity ?? 0);
+      gold = Math.max(0, gold - amount);
+      await patchCampaign(campaign.campaignId, "SET playerStats.gold = :g", { ":g": gold });
+    } else {
+      inventory = inventory.filter((i) => i !== item);
+      await patchCampaign(campaign.campaignId, "SET inventory = :inv", { ":inv": inventory });
+    }
   } else if (action === "use") {
     const ITEM_EFFECTS: Record<string, string> = {
       MysteryCanOfTuna: "Restore 40hp",
@@ -292,7 +299,7 @@ export const handler = async (input: ToolInput): Promise<{ result: ToolResult }>
   }
 
   const { campaignId, turnId, toolName, toolArgs } = input;
-  const idempotencyKey = makeIdempotencyKey(campaignId, turnId, toolName, String(toolArgs.purpose ?? toolName));
+  const idempotencyKey = makeIdempotencyKey(campaignId, turnId, toolName, String(toolArgs.purpose ?? toolArgs.item ?? toolName));
 
   const cached = await getCachedResult<ToolResult>(idempotencyKey);
   if (cached) {

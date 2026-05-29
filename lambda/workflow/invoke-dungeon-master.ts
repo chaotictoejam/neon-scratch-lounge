@@ -20,7 +20,7 @@ You must respond with valid JSON matching this exact schema:
   "nextLocation": "string or null",
   "questUpdate": "string or null",
   "combatOccurred": boolean,
-  "enemyDefeated": "string or null",
+  "enemyDefeated": "string (enemy name e.g. 'RoombaCoreDrone') when an enemy dies this turn, otherwise null",
   "gameOver": boolean,
   "gameOverReason": "death" | "victory" | null,
   "dmInternalNote": "string (debugging note, not shown to player)"
@@ -31,6 +31,7 @@ Available tools:
 - apply-damage: {amount, source}
 - update-inventory: {action ("add"|"remove"|"use"), item, quantity}
   GOLD RULE: to award gold use action "add", item "CreditChips", quantity <number>. NEVER put a number or description inside the item name (e.g. never "15 CreditChips" or "CreditChips (salvaged)"). item must be exactly "CreditChips" with the amount in quantity.
+  SPEND GOLD RULE: to spend gold on a purchase use action "remove", item "CreditChips", quantity <cost>. ALWAYS call this when the player buys something. NEVER just narrate the deduction without calling update-inventory.
 - award-xp: {amount, reason}
 - update-location: {location}
 - apply-effect: {effect, turnsRemaining}
@@ -38,7 +39,8 @@ Available tools:
 - update-quest-log: {entry}
 
 Always call roll-dice before apply-damage in combat. Always award-xp when enemies are defeated.
-Always include a descriptive "purpose" on every roll-dice call.`;
+Always include a descriptive "purpose" on every roll-dice call.
+CRITICAL: When an enemy is killed or destroyed this turn, you MUST set enemyDefeated to that enemy's name — never leave it null after a kill.`;
 
 export class DMOutputValidationError extends Error {
   constructor(message: string) {
