@@ -188,7 +188,7 @@ export const CLASS_META: Record<CharacterClass, {
 
 export const WORKFLOW_STEPS_DEFAULT: WorkflowStep[] = [
   { name: "RetrieveLore", label: "RetrieveLore", service: "Bedrock KB", status: "pending" },
-  { name: "InvokeDungeonMaster", label: "InvokeDungeonMaster", service: "Claude 3.5", status: "pending" },
+  { name: "InvokeDungeonMaster", label: "InvokeDungeonMaster", service: "Claude 4.5", status: "pending" },
   { name: "ValidateAndRoute", label: "ValidateAndRoute", service: "Lambda", status: "pending" },
   { name: "ExecuteTools", label: "ExecuteTools", service: "Lambda × 3", status: "pending" },
   { name: "PersistCampaign", label: "PersistCampaign", service: "DynamoDB", status: "pending" },
