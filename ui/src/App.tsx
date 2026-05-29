@@ -14,7 +14,8 @@ import { useGame } from "./context/GameContext";
 
 function AppInner() {
   const { state } = useGame();
-  const [showClassSelector, setShowClassSelector] = useState(false);
+  // Open class selector immediately on first load — no campaignId means nothing is playable
+  const [showClassSelector, setShowClassSelector] = useState(!state.campaignId);
 
   useWorkflowAnimation(state.isProcessing);
 

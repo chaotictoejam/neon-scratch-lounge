@@ -144,8 +144,14 @@ export function CharacterHUD({ onNewGame }: { onNewGame: () => void }) {
       )}
 
       {!stats && (
-        <div className="text-[#6644aa] text-xs text-center py-2">
-          Start a new game to begin your adventure.
+        <div className="text-center py-2">
+          <span className="text-[#6644aa] text-xs">No active campaign — </span>
+          <button
+            onClick={onNewGame}
+            className="text-[#00ffcc] text-xs underline underline-offset-2 hover:text-glow-teal"
+          >
+            pick a class to start
+          </button>
         </div>
       )}
     </div>

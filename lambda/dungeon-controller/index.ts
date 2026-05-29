@@ -33,19 +33,39 @@ function makeTtl(): number {
   return Math.floor(Date.now() / 1000) + CAMPAIGN_TTL_DAYS * 86400;
 }
 
-export const handler = async (event: PlayerAction): Promise<FormattedResponse> => {
+interface ProxyEvent { body: string | null }
+interface ProxyResult { statusCode: number; headers: Record<string, string>; body: string }
+
+const CORS = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
+
+function ok(body: unknown): ProxyResult {
+  return { statusCode: 200, headers: CORS, body: JSON.stringify(body) };
+}
+function err(statusCode: number, message: string): ProxyResult {
+  return { statusCode, headers: CORS, body: JSON.stringify({ message }) };
+}
+
+export const handler = async (event: ProxyEvent): Promise<ProxyResult> => {
+  let playerAction: PlayerAction;
+  try {
+    playerAction = JSON.parse(event.body ?? "{}") as PlayerAction;
+  } catch {
+    return err(400, "Invalid JSON body");
+  }
+
   const start = Date.now();
-  const { playerId, action } = event;
-  let campaignId = event.campaignId;
+  const { playerId, action } = playerAction;
+  let campaignId = playerAction.campaignId;
   const correlationId = uuidv4();
 
   let campaign: Campaign;
 
+  if (!playerId) return err(400, "playerId is required");
+  if (!action) return err(400, "action is required");
+
   if (action === "new-game") {
-    if (!event.characterClass) {
-      throw new Error("characterClass is required for new-game action");
-    }
-    const characterClass = event.characterClass as CharacterClass;
+    if (!playerAction.characterClass) return err(400, "characterClass is required for new-game action");
+    const characterClass = playerAction.characterClass as CharacterClass;
     campaignId = uuidv4();
     const characterName = pickName(characterClass);
     const stats = CLASS_STARTING_STATS[characterClass];
@@ -73,14 +93,12 @@ export const handler = async (event: PlayerAction): Promise<FormattedResponse> =
 
     await ddb.send(new PutCommand({ TableName: CAMPAIGNS_TABLE, Item: campaign }));
   } else {
-    if (!campaignId) throw new Error("campaignId is required for existing campaigns");
+    if (!campaignId) return err(400, "campaignId is required for existing campaigns");
     const result = await ddb.send(new GetCommand({ TableName: CAMPAIGNS_TABLE, Key: { campaignId } }));
-    if (!result.Item) throw new Error(`Campaign ${campaignId} not found`);
+    if (!result.Item) return err(404, `Campaign ${campaignId} not found`);
     campaign = result.Item as Campaign;
 
-    if (campaign.gameOver) {
-      throw new Error("This campaign has ended. Start a new game.");
-    }
+    if (campaign.gameOver) return err(400, "This campaign has ended. Start a new game.");
   }
 
   // Build workflow input
@@ -146,8 +164,8 @@ export const handler = async (event: PlayerAction): Promise<FormattedResponse> =
       error: sfnResult.error,
       cause: sfnResult.cause,
     });
-    throw new Error(`Workflow failed: ${sfnResult.error}`);
+    return err(502, `Workflow failed: ${sfnResult.error ?? "unknown"}`);
   }
 
-  return output;
+  return ok(output);
 };

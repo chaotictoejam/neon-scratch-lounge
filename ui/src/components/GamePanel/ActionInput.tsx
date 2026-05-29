@@ -45,7 +45,13 @@ export function ActionInput() {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKey}
         disabled={disabled}
-        placeholder={disabled ? "Processing turn..." : PLACEHOLDER_ACTIONS[placeholderIdx]}
+        placeholder={
+          state.isProcessing
+            ? "Processing turn..."
+            : !state.campaignId
+            ? "Start a new game above to play ↑"
+            : PLACEHOLDER_ACTIONS[placeholderIdx]
+        }
         className="flex-1 bg-transparent text-[#c8ccd4] text-sm py-2 outline-none placeholder-[#6644aa]/60 disabled:cursor-not-allowed"
         autoComplete="off"
         spellCheck="false"
