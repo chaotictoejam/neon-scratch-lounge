@@ -26,8 +26,18 @@ You must respond with valid JSON matching this exact schema:
   "dmInternalNote": "string (debugging note, not shown to player)"
 }
 
-Available tools: roll-dice, apply-damage, update-inventory, award-xp, update-location, apply-effect, use-special-ability, update-quest-log.
-Always call roll-dice before apply-damage in combat. Always award-xp when enemies are defeated.`;
+Available tools:
+- roll-dice: {sides, count, modifier, purpose (REQUIRED — describe what the roll is for, e.g. "attack", "stealth-check", "lockpicking", "damage", "initiative"), statBonus}
+- apply-damage: {amount, source}
+- update-inventory: {action ("add"|"remove"), item}
+- award-xp: {amount, reason}
+- update-location: {location}
+- apply-effect: {effect, turnsRemaining}
+- use-special-ability: {abilityName}
+- update-quest-log: {entry}
+
+Always call roll-dice before apply-damage in combat. Always award-xp when enemies are defeated.
+Always include a descriptive "purpose" on every roll-dice call.`;
 
 export class DMOutputValidationError extends Error {
   constructor(message: string) {

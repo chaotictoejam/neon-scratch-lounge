@@ -29,7 +29,9 @@ export class WorkflowStack extends cdk.Stack {
 
     const config = this.node.tryGetContext("neonScratch") ?? {};
     const bedrockRegion: string = config.bedrockRegion ?? "us-east-1";
-    const bedrockModelId: string = config.bedrockModelId ?? "anthropic.claude-sonnet-4-20250514";
+    const bedrockModelId: string = config.bedrockModelId ?? "us.anthropic.claude-sonnet-4-20250514-v1:0";
+    // Strip cross-region prefix to get the base foundation-model ID for IAM resource ARNs
+    const bedrockBaseModelId: string = bedrockModelId.replace(/^(us|eu|ap)\./, "");
     const toolResultTtlSeconds: number = config.toolResultTtlSeconds ?? 3600;
     const maxConversationHistory: number = config.maxConversationHistory ?? 20;
     const xpPerLevel: number = config.xpPerLevel ?? 100;
@@ -110,7 +112,10 @@ export class WorkflowStack extends cdk.Stack {
     invokeDmFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["bedrock:InvokeModel"],
-      resources: [`arn:aws:bedrock:${bedrockRegion}::foundation-model/${bedrockModelId}`],
+      resources: [
+        `arn:aws:bedrock:*::foundation-model/${bedrockBaseModelId}`,
+        `arn:aws:bedrock:${bedrockRegion}:${this.account}:inference-profile/${bedrockModelId}`,
+      ],
     }));
 
     // validate-and-route Lambda
@@ -152,7 +157,10 @@ export class WorkflowStack extends cdk.Stack {
     persistCampaignFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["bedrock:InvokeModel"],
-      resources: [`arn:aws:bedrock:${bedrockRegion}::foundation-model/${bedrockModelId}`],
+      resources: [
+        `arn:aws:bedrock:*::foundation-model/${bedrockBaseModelId}`,
+        `arn:aws:bedrock:${bedrockRegion}:${this.account}:inference-profile/${bedrockModelId}`,
+      ],
     }));
 
     // format-response Lambda
