@@ -5,6 +5,7 @@ import * as eventTargets from "aws-cdk-lib/aws-events-targets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as sqs from "aws-cdk-lib/aws-sqs";
@@ -93,12 +94,18 @@ export class WorkflowStack extends cdk.Stack {
     });
 
     // invoke-dungeon-master Lambda
+    const invokeDmLogGroup = new logs.LogGroup(this, "DmLogGroup", {
+      logGroupName: "/aws/lambda/neon-scratch-invoke-dungeon-master",
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
     const invokeDmFn = new lambdaNodejs.NodejsFunction(this, "InvokeDungeonMaster", {
       ...commonLambdaProps,
       functionName: "neon-scratch-invoke-dungeon-master",
       entry: path.join(__dirname, "../../lambda/workflow/invoke-dungeon-master.ts"),
       timeout: cdk.Duration.seconds(timeouts.invokeDm + 5),
       environment: commonEnv,
+      logGroup: invokeDmLogGroup,
     });
     invokeDmFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
@@ -116,12 +123,18 @@ export class WorkflowStack extends cdk.Stack {
     });
 
     // execute-tool Lambda (also exposed as public for demo failure injection)
+    const executeToolLogGroup = new logs.LogGroup(this, "ExecuteToolLogGroup", {
+      logGroupName: "/aws/lambda/neon-scratch-execute-tool",
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
     const executeToolFn = new lambdaNodejs.NodejsFunction(this, "ExecuteTool", {
       ...commonLambdaProps,
       functionName: "neon-scratch-execute-tool",
       entry: path.join(__dirname, "../../lambda/workflow/execute-tool.ts"),
       timeout: cdk.Duration.seconds(timeouts.executeTool + 5),
       environment: commonEnv,
+      logGroup: executeToolLogGroup,
     });
     props.campaignsTable.grantReadWriteData(executeToolFn);
     props.toolResultsTable.grantReadWriteData(executeToolFn);
@@ -298,6 +311,11 @@ export class WorkflowStack extends cdk.Stack {
     this.dlq.grantSendMessages(this.stateMachine);
 
     // Dungeon Controller Lambda — receives player actions, publishes to EventBridge
+    const controllerLogGroup = new logs.LogGroup(this, "ControllerLogGroup", {
+      logGroupName: "/aws/lambda/neon-scratch-dungeon-controller",
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
     this.dungeonControllerFunction = new lambdaNodejs.NodejsFunction(this, "DungeonController", {
       ...commonLambdaProps,
       functionName: "neon-scratch-dungeon-controller",
@@ -308,6 +326,7 @@ export class WorkflowStack extends cdk.Stack {
         EVENT_BUS_NAME: "neon-scratch-events",
         STATE_MACHINE_ARN: this.stateMachine.stateMachineArn,
       },
+      logGroup: controllerLogGroup,
     });
     props.campaignsTable.grantReadWriteData(this.dungeonControllerFunction);
 

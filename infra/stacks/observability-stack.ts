@@ -24,25 +24,20 @@ export class ObservabilityStack extends cdk.Stack {
       displayName: "Neon Scratch Lounge Alerts",
     });
 
-    // Create log groups explicitly as CFN resources so metric filters can attach
-    // to them immediately — without this they only exist after first invocation.
-    const controllerLogGroup = new logs.LogGroup(this, "ControllerLogGroup", {
-      logGroupName: `/aws/lambda/${props.dungeonControllerFunction.functionName}`,
-      retention: logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    const executeToolLogGroup = new logs.LogGroup(this, "ExecuteToolLogGroup", {
-      logGroupName: "/aws/lambda/neon-scratch-execute-tool",
-      retention: logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    const dmLogGroup = new logs.LogGroup(this, "DmLogGroup", {
-      logGroupName: "/aws/lambda/neon-scratch-invoke-dungeon-master",
-      retention: logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
+    // Log groups are owned by WorkflowStack (defined alongside their Lambda functions).
+    // Reference them here by name — WorkflowStack deploys first via addDependency.
+    const controllerLogGroup = logs.LogGroup.fromLogGroupName(
+      this, "ControllerLogGroup",
+      `/aws/lambda/${props.dungeonControllerFunction.functionName}`,
+    );
+    const executeToolLogGroup = logs.LogGroup.fromLogGroupName(
+      this, "ExecuteToolLogGroup",
+      "/aws/lambda/neon-scratch-execute-tool",
+    );
+    const dmLogGroup = logs.LogGroup.fromLogGroupName(
+      this, "DmLogGroup",
+      "/aws/lambda/neon-scratch-invoke-dungeon-master",
+    );
 
     // Metric filters — assigned to const to satisfy the linter; the CDK
     // construct registers itself on the tree so no further reference is needed.
@@ -121,7 +116,7 @@ export class ObservabilityStack extends cdk.Stack {
             label: "Player Actions",
           }),
         ],
-        width: 6,
+        width: 8,
         height: 4,
       }),
       // DLQ depth
@@ -137,7 +132,7 @@ export class ObservabilityStack extends cdk.Stack {
             label: "DLQ Messages",
           }),
         ],
-        width: 6,
+        width: 8,
         height: 4,
       }),
       // Monsters defeated
@@ -152,14 +147,7 @@ export class ObservabilityStack extends cdk.Stack {
             label: "Monsters",
           }),
         ],
-        width: 6,
-        height: 4,
-      }),
-      // Error rate
-      new cloudwatch.AlarmStatusWidget({
-        title: "System Health",
-        alarms: [],
-        width: 6,
+        width: 8,
         height: 4,
       })
     );
