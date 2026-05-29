@@ -149,7 +149,14 @@ export function CharacterHUD({ onNewGame }: { onNewGame: () => void }) {
         </>
       )}
 
-      {!stats && (
+      {!stats && state.isProcessing && (
+        <div className="text-center py-2">
+          <span className="text-[#6644aa] text-xs">Loading</span>
+          <span className="text-[#00ffcc] text-xs animate-pulse">...</span>
+        </div>
+      )}
+
+      {!stats && !state.isProcessing && (
         <div className="text-center py-2">
           <span className="text-[#6644aa] text-xs">No active campaign — </span>
           <button

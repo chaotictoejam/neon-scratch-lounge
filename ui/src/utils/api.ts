@@ -26,7 +26,33 @@ export async function sendAction(params: {
     throw new Error(`API error ${res.status}: ${text}`);
   }
 
-  return res.json() as Promise<ApiTurnResponse>;
+  const data = await res.json();
+
+  // Async flow: server returns { turnId } immediately, result arrives via polling
+  if (data.turnId && !data.narrative) {
+    return pollTurnResult(data.turnId);
+  }
+
+  return data as ApiTurnResponse;
+}
+
+async function pollTurnResult(turnId: string): Promise<ApiTurnResponse> {
+  const MAX_ATTEMPTS = 45; // 90 seconds at 2s intervals
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      const res = await fetch(`${BASE_URL}/action/status?turnId=${encodeURIComponent(turnId)}`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.status === "complete") return data.result as ApiTurnResponse;
+      if (data.status === "error") throw new Error(data.message ?? "Turn failed");
+      // status === "running" or "not_found" — keep polling
+    } catch (err) {
+      if (err instanceof Error && err.message !== "Turn failed" && !err.message.startsWith("Turn")) continue;
+      throw err;
+    }
+  }
+  throw new Error("Turn timed out — the DM is unreachable. Try again.");
 }
 
 export async function injectFailure(): Promise<void> {

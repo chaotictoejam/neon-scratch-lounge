@@ -15,6 +15,7 @@ import * as path from "path";
 export interface WorkflowStackProps extends cdk.StackProps {
   campaignsTable: dynamodb.Table;
   toolResultsTable: dynamodb.Table;
+  turnResultsTable: dynamodb.Table;
   knowledgeBaseId?: string;
 }
 
@@ -169,8 +170,9 @@ export class WorkflowStack extends cdk.Stack {
       functionName: "neon-scratch-format-response",
       entry: path.join(__dirname, "../../lambda/workflow/format-response.ts"),
       timeout: cdk.Duration.seconds(10),
-      environment: commonEnv,
+      environment: { ...commonEnv, TURN_RESULTS_TABLE: props.turnResultsTable.tableName },
     });
+    props.turnResultsTable.grantWriteData(formatResponseFn);
 
     // Bedrock Knowledge Base retrieve permission (only when KB mode is enabled)
     if (props.knowledgeBaseId) {
@@ -328,16 +330,18 @@ export class WorkflowStack extends cdk.Stack {
       ...commonLambdaProps,
       functionName: "neon-scratch-dungeon-controller",
       entry: path.join(__dirname, "../../lambda/dungeon-controller/index.ts"),
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(10),
       environment: {
         ...commonEnv,
         EVENT_BUS_NAME: "neon-scratch-events",
         STATE_MACHINE_ARN: this.stateMachine.stateMachineArn,
+        TURN_RESULTS_TABLE: props.turnResultsTable.tableName,
       },
       logGroup: controllerLogGroup,
     });
     props.campaignsTable.grantReadWriteData(this.dungeonControllerFunction);
-    this.stateMachine.grantStartSyncExecution(this.dungeonControllerFunction);
+    props.turnResultsTable.grantReadWriteData(this.dungeonControllerFunction);
+    this.stateMachine.grantStartExecution(this.dungeonControllerFunction);
 
     // EventBridge custom bus
     const eventBus = new events.EventBus(this, "NeonScratchEventBus", {

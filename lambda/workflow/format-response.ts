@@ -1,4 +1,11 @@
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { FormattedResponse, WorkflowInput, DMOutput, ToolResult, DiceRollResult, WorkflowStep, LogLine, TurnMetrics } from "../shared/types";
+
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
+  marshallOptions: { removeUndefinedValues: true },
+});
+const TURN_RESULTS_TABLE = process.env.TURN_RESULTS_TABLE ?? "";
 
 type FormatInput = WorkflowInput & {
   dmOutput: DMOutput;
@@ -57,7 +64,7 @@ export const handler = async (input: FormatInput): Promise<FormattedResponse> =>
     toolCalls: toolCallsSummary,
   };
 
-  return {
+  const result: FormattedResponse = {
     campaignId: input.campaignId,
     characterName: campaign.characterName,
     characterClass: campaign.characterClass,
@@ -79,4 +86,17 @@ export const handler = async (input: FormatInput): Promise<FormattedResponse> =>
     specialAbilityState: campaign.specialAbilityState,
     retryCount: input.retryCount ?? 0,
   };
+
+  // Persist result for async polling — non-fatal if it fails
+  if (TURN_RESULTS_TABLE && input.correlationId) {
+    await ddb.send(new UpdateCommand({
+      TableName: TURN_RESULTS_TABLE,
+      Key: { turnId: input.correlationId },
+      UpdateExpression: "SET #s = :s, #r = :r",
+      ExpressionAttributeNames: { "#s": "status", "#r": "result" },
+      ExpressionAttributeValues: { ":s": "complete", ":r": result },
+    })).catch((e) => console.error("Failed to write turn result:", e));
+  }
+
+  return result;
 };

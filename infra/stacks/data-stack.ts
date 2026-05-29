@@ -5,6 +5,7 @@ import { Construct } from "constructs";
 export class DataStack extends cdk.Stack {
   public readonly campaignsTable: dynamodb.Table;
   public readonly toolResultsTable: dynamodb.Table;
+  public readonly turnResultsTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -33,6 +34,14 @@ export class DataStack extends cdk.Stack {
     this.toolResultsTable = new dynamodb.Table(this, "ToolResultsTable", {
       tableName: "neon-scratch-tool-results",
       partitionKey: { name: "idempotencyKey", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      timeToLiveAttribute: "ttl",
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    this.turnResultsTable = new dynamodb.Table(this, "TurnResultsTable", {
+      tableName: "neon-scratch-turn-results",
+      partitionKey: { name: "turnId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: "ttl",
       removalPolicy: cdk.RemovalPolicy.DESTROY,

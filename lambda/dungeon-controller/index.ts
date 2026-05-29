@@ -1,11 +1,11 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { EventBridgeClient, PutEventsCommand } from "@aws-sdk/client-eventbridge";
-import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
+import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 import { v4 as uuidv4 } from "uuid";
 import {
   Campaign, CharacterClass, CLASS_STARTING_STATS, CHARACTER_NAMES,
-  PlayerAction, FormattedResponse,
+  PlayerAction,
 } from "../shared/types";
 import { log, logError } from "../shared/logger";
 
@@ -14,13 +14,14 @@ const eb = new EventBridgeClient({});
 const sfn = new SFNClient({});
 
 const CAMPAIGNS_TABLE = process.env.CAMPAIGNS_TABLE!;
+const TURN_RESULTS_TABLE = process.env.TURN_RESULTS_TABLE!;
 const EVENT_BUS_NAME = process.env.EVENT_BUS_NAME!;
 const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN!;
 const CAMPAIGN_TTL_DAYS = parseInt(process.env.CAMPAIGN_TTL_DAYS ?? "30", 10);
+const TURN_TTL_SECONDS = 3600; // 1 hour
 
 function pickName(characterClass: CharacterClass): string {
   const names = CHARACTER_NAMES[characterClass];
-  // Deterministic selection based on class — same class always rotates through same pool
   const seed = characterClass.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   return names[seed % names.length];
 }
@@ -53,7 +54,6 @@ export const handler = async (event: ProxyEvent): Promise<ProxyResult> => {
     return err(400, "Invalid JSON body");
   }
 
-  const start = Date.now();
   const { playerId, action } = playerAction;
   let campaignId = playerAction.campaignId;
   const correlationId = uuidv4();
@@ -101,7 +101,6 @@ export const handler = async (event: ProxyEvent): Promise<ProxyResult> => {
     if (campaign.gameOver) return err(400, "This campaign has ended. Start a new game.");
   }
 
-  // Build workflow input
   const workflowInput = {
     campaignId,
     playerId,
@@ -110,62 +109,37 @@ export const handler = async (event: ProxyEvent): Promise<ProxyResult> => {
     correlationId,
   };
 
-  // For Express workflows, start synchronous execution directly (faster than EventBridge roundtrip)
-  // EventBridge is still published for audit trail
-  await eb.send(new PutEventsCommand({
+  // Record pending turn so the status Lambda can report progress
+  const startedAt = Date.now();
+  await ddb.send(new PutCommand({
+    TableName: TURN_RESULTS_TABLE,
+    Item: {
+      turnId: correlationId,
+      campaignId,
+      status: "running",
+      startedAt,
+      ttl: Math.floor(startedAt / 1000) + TURN_TTL_SECONDS,
+    },
+  }));
+
+  // Fire-and-forget to EventBridge for audit trail
+  eb.send(new PutEventsCommand({
     Entries: [{
       Source: "neon-scratch-lounge",
       DetailType: "PlayerAction",
       Detail: JSON.stringify(workflowInput),
       EventBusName: EVENT_BUS_NAME,
     }],
-  }));
+  })).catch((e) => logError({ requestId: correlationId, error: "EventBridge publish failed", cause: String(e) }));
 
-  // Start Express Workflow synchronously for real-time response
-  const sfnResult = await sfn.send(new StartSyncExecutionCommand({
+  // Start async execution — no waiting, no 29-second API GW constraint
+  await sfn.send(new StartExecutionCommand({
     stateMachineArn: STATE_MACHINE_ARN,
     input: JSON.stringify(workflowInput),
     name: `${campaignId}-${correlationId}`.substring(0, 80),
   }));
 
-  const latencyMs = Date.now() - start;
-  const success = sfnResult.status === "SUCCEEDED";
-  const output: FormattedResponse = success
-    ? JSON.parse(sfnResult.output ?? "{}")
-    : {} as FormattedResponse;
+  log({ requestId: correlationId, toolName: "dungeon-controller-start", campaignId, action });
 
-  const toolCount = output.metrics?.toolCalls?.length ?? 0;
-  const workflowPath = [
-    "retrieve-lore",
-    "invoke-dm",
-    "validate-route",
-    `execute-tools(${toolCount})`,
-    "persist-campaign",
-    "format-response",
-    ...(output.gameOver ? ["[GAME_OVER]"] : []),
-  ].join(" → ");
-
-  // One structured log line per request — queryable in CloudWatch Logs Insights
-  log({
-    requestId: correlationId,
-    toolName: "dungeon-controller",
-    inputTokens: output.metrics?.inputTokens ?? 0,
-    outputTokens: output.metrics?.outputTokens ?? 0,
-    latencyMs,
-    retryCount: output.retryCount ?? 0,
-    workflowPath,
-    success,
-  });
-
-  if (!success) {
-    logError({
-      requestId: correlationId,
-      campaignId,
-      error: sfnResult.error,
-      cause: sfnResult.cause,
-    });
-    return err(502, `Workflow failed: ${sfnResult.error ?? "unknown"}`);
-  }
-
-  return ok(output);
+  return ok({ turnId: correlationId, campaignId });
 };

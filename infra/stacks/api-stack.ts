@@ -1,5 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import * as apigw from "aws-cdk-lib/aws-apigateway";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
@@ -9,6 +10,7 @@ import * as path from "path";
 export interface ApiStackProps extends cdk.StackProps {
   dungeonControllerFunction: lambda.Function;
   executeToolFunctionName: string;
+  turnResultsTable: dynamodb.Table;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -119,6 +121,26 @@ export class ApiStack extends cdk.Stack {
     logsResource.addMethod(
       "GET",
       new apigw.LambdaIntegration(fetchLogsFn, { proxy: true })
+    );
+
+    // GET /action/status — poll for async turn result
+    const turnStatusFn = new lambdaNodejs.NodejsFunction(this, "TurnStatus", {
+      functionName: "neon-scratch-turn-status",
+      entry: path.join(__dirname, "../../lambda/dungeon-controller/status.ts"),
+      handler: "handler",
+      runtime: lambda.Runtime.NODEJS_LATEST,
+      timeout: cdk.Duration.seconds(5),
+      bundling: demoBundling,
+      environment: {
+        TURN_RESULTS_TABLE: props.turnResultsTable.tableName,
+      },
+    });
+    props.turnResultsTable.grantReadData(turnStatusFn);
+
+    const statusResource = actionResource.addResource("status");
+    statusResource.addMethod(
+      "GET",
+      new apigw.LambdaIntegration(turnStatusFn, { proxy: true })
     );
 
     this.apiUrl = api.url;

@@ -22,6 +22,7 @@ const workflowStack = new WorkflowStack(app, "NeonScratchWorkflow", {
   env,
   campaignsTable: dataStack.campaignsTable,
   toolResultsTable: dataStack.toolResultsTable,
+  turnResultsTable: dataStack.turnResultsTable,
   knowledgeBaseId: kbStack.knowledgeBaseId || undefined,
 });
 workflowStack.addDependency(dataStack);
@@ -39,6 +40,7 @@ const apiStack = new ApiStack(app, "NeonScratchApi", {
   env,
   dungeonControllerFunction: workflowStack.dungeonControllerFunction,
   executeToolFunctionName: workflowStack.executeToolFunction.functionName,
+  turnResultsTable: dataStack.turnResultsTable,
 });
 apiStack.addDependency(workflowStack);
 
