@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { useDiceAnimation } from "../../hooks/useDiceAnimation";
 import { DiceRoll } from "../../types";
@@ -87,14 +88,34 @@ function SingleRoll({ roll }: { roll: DiceRoll }) {
 
 export function DiceRollDisplay() {
   const { state } = useGame();
+  const [expanded, setExpanded] = useState(true);
+
+  // Auto-expand whenever new rolls arrive
+  useEffect(() => {
+    if (state.diceRolls.length > 0) setExpanded(true);
+  }, [state.diceRolls]);
 
   if (!state.diceRolls.length) return null;
 
   return (
-    <div className="space-y-2">
-      {state.diceRolls.map((roll, i) => (
-        <SingleRoll key={i} roll={roll} />
-      ))}
+    <div className="border border-[#6644aa]/40 rounded bg-[#080810]">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-[#6644aa] hover:text-[#c8ccd4] transition-colors"
+      >
+        <span className="uppercase tracking-widest">
+          ◈ Dice Rolls ({state.diceRolls.length})
+        </span>
+        <span>{expanded ? "▲ hide" : "▼ show"}</span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-2 px-3 pb-3">
+          {state.diceRolls.map((roll, i) => (
+            <SingleRoll key={i} roll={roll} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

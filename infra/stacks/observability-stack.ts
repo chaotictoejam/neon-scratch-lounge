@@ -38,6 +38,10 @@ export class ObservabilityStack extends cdk.Stack {
       this, "DmLogGroup",
       "/aws/lambda/neon-scratch-invoke-dungeon-master",
     );
+    const formatResponseLogGroup = logs.LogGroup.fromLogGroupName(
+      this, "FormatResponseLogGroup",
+      "/aws/lambda/neon-scratch-format-response",
+    );
 
     // Metric filters — assigned to const to satisfy the linter; the CDK
     // construct registers itself on the tree so no further reference is needed.
@@ -50,7 +54,7 @@ export class ObservabilityStack extends cdk.Stack {
     });
 
     new logs.MetricFilter(this, "ControllerLatencyFilter", {
-      logGroup: controllerLogGroup,
+      logGroup: formatResponseLogGroup,
       metricNamespace: "NeonScratch",
       metricName: "ControllerLatencyMs",
       filterPattern: logs.FilterPattern.exists("$.latencyMs"),
@@ -66,10 +70,10 @@ export class ObservabilityStack extends cdk.Stack {
     });
 
     new logs.MetricFilter(this, "MonstersDefeatedFilter", {
-      logGroup: executeToolLogGroup,
+      logGroup: dmLogGroup,
       metricNamespace: "NeonScratch",
       metricName: "MonstersDefeated",
-      filterPattern: logs.FilterPattern.exists("$.enemyDefeated"),
+      filterPattern: logs.FilterPattern.literal('{ $.enemyDefeated != "null" }'),
       metricValue: "1",
     });
 

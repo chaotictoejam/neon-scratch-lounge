@@ -9,12 +9,13 @@ function CwlRow({ row, idx }: { row: CwlLogRow; idx: number }) {
   const latMs = row.latencyMs ? Number(row.latencyMs) : null;
   const latClass = latMs !== null ? latencyColor(latMs) : "text-[#6644aa]/60";
 
-  // Infer source lambda from which structured fields are present
-  const source = row.toolName
-    ? "exec-tool"
-    : row.inputTokens
-      ? "invoke-dm"
-      : "controller";
+  const source = row.toolName?.includes("dungeon-controller")
+    ? "controller"
+    : row.toolName
+      ? "exec-tool"
+      : row.inputTokens
+        ? "invoke-dm"
+        : "controller";
 
   return (
     <div

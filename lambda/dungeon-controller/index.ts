@@ -101,16 +101,17 @@ export const handler = async (event: ProxyEvent): Promise<ProxyResult> => {
     if (campaign.gameOver) return err(400, "This campaign has ended. Start a new game.");
   }
 
+  // Record pending turn so the status Lambda can report progress
+  const startedAt = Date.now();
+
   const workflowInput = {
     campaignId,
     playerId,
     action,
     campaign,
     correlationId,
+    startedAt,
   };
-
-  // Record pending turn so the status Lambda can report progress
-  const startedAt = Date.now();
   await ddb.send(new PutCommand({
     TableName: TURN_RESULTS_TABLE,
     Item: {
@@ -139,7 +140,7 @@ export const handler = async (event: ProxyEvent): Promise<ProxyResult> => {
     name: `${campaignId}-${correlationId}`.substring(0, 80),
   }));
 
-  log({ requestId: correlationId, toolName: "dungeon-controller-start", campaignId, action });
+  log({ requestId: correlationId, toolName: "dungeon-controller-start", campaignId, action, success: true });
 
   return ok({ turnId: correlationId, campaignId });
 };

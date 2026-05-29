@@ -163,7 +163,7 @@ async function updateInventory(args: Record<string, unknown>, campaign: Campaign
 }
 
 async function awardXp(args: Record<string, unknown>, campaign: Campaign): Promise<XpResult> {
-  const xp = Number(args.xp ?? 0);
+  const xp = Number(args.amount ?? args.xp ?? 0);
   const previousLevel = campaign.playerStats.level;
   const newXp = campaign.playerStats.xp + xp;
   const newLevel = Math.floor(newXp / XP_PER_LEVEL) + 1;
@@ -340,6 +340,6 @@ export const handler = async (input: ToolInput): Promise<{ result: ToolResult }>
   const toolResult: ToolResult = { toolName, result };
   await setCachedResult(idempotencyKey, toolResult);
 
-  log({ toolName, campaignId, turnId, idempotencyHit: false });
+  log({ toolName, campaignId, turnId, idempotencyHit: false, success: true });
   return { result: toolResult };
 };

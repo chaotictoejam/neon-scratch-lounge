@@ -1,6 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { FormattedResponse, WorkflowInput, DMOutput, ToolResult, DiceRollResult, WorkflowStep, LogLine, TurnMetrics } from "../shared/types";
+import { log } from "../shared/logger";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
   marshallOptions: { removeUndefinedValues: true },
@@ -16,6 +17,7 @@ type FormatInput = WorkflowInput & {
   inputTokens?: number;
   outputTokens?: number;
   retryCount?: number;
+  startedAt?: number;
   workflowTrace?: WorkflowStep[];
   logLines?: LogLine[];
   metrics?: TurnMetrics;
@@ -86,6 +88,10 @@ export const handler = async (input: FormatInput): Promise<FormattedResponse> =>
     specialAbilityState: campaign.specialAbilityState,
     retryCount: input.retryCount ?? 0,
   };
+
+  if (input.startedAt) {
+    log({ campaignId: input.campaignId, latencyMs: Date.now() - input.startedAt, success: true });
+  }
 
   // Persist result for async polling — non-fatal if it fails
   if (TURN_RESULTS_TABLE && input.correlationId) {

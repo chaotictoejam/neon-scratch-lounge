@@ -164,6 +164,7 @@ export const handler = async (input: DmInput): Promise<DmInput & { dmOutput: DMO
     combatOccurred: dmOutput.combatOccurred,
     enemyDefeated: dmOutput.enemyDefeated,
     toolCallCount: dmOutput.toolCalls.length,
+    success: true,
   });
 
   return { ...input, dmOutput, inputTokens, outputTokens };
