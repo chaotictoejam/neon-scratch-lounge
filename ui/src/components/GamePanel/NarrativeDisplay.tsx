@@ -1,6 +1,46 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { useTypewriter } from "../../hooks/useTypewriter";
+
+const DM_STATUS_WORDS = [
+  "consulting the lore",
+  "rolling dice",
+  "crafting narrative",
+  "checking your stats",
+  "weaving the plot",
+  "planning your doom",
+  "invoking bedrock",
+  "thinking",
+];
+
+function DmThinking({ isNewCampaign }: { isNewCampaign: boolean }) {
+  const [wordIdx, setWordIdx] = useState(0);
+  const [dotCount, setDotCount] = useState(1);
+
+  useEffect(() => {
+    const id = setInterval(() => setWordIdx((i) => (i + 1) % DM_STATUS_WORDS.length), 1800);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setDotCount((d) => (d % 3) + 1), 450);
+    return () => clearInterval(id);
+  }, []);
+
+  const dots = ".".repeat(dotCount);
+
+  return (
+    <div className="mt-1">
+      <p className="text-[#6644aa] text-sm">
+        {isNewCampaign ? "Initialising campaign" : "The DM stirs in the neon dark"}
+        <span className="text-[#00ffcc]">{dots}</span>
+      </p>
+      <p className="text-[#6644aa]/50 text-xs mt-1 pl-2 font-mono">
+        ↳ {DM_STATUS_WORDS[wordIdx]}{dots}
+      </p>
+    </div>
+  );
+}
 
 function HistoryEntry({ text }: { text: string }) {
   return (
@@ -10,22 +50,13 @@ function HistoryEntry({ text }: { text: string }) {
   );
 }
 
-function CurrentEntry({ text, isProcessing }: { text: string; isProcessing: boolean }) {
+function CurrentEntry({ text }: { text: string }) {
   const { displayed, done } = useTypewriter(text, 15);
 
   return (
     <p className="text-[#c8ccd4] text-sm leading-relaxed">
-      {isProcessing ? (
-        <span className="text-[#6644aa]">
-          The DM stirs in the neon dark
-          <span className="cursor-blink text-[#00ffcc]">▌</span>
-        </span>
-      ) : (
-        <>
-          {displayed}
-          {!done && <span className="cursor-blink text-[#00ffcc]">▌</span>}
-        </>
-      )}
+      {displayed}
+      {!done && <span className="cursor-blink text-[#00ffcc]">▌</span>}
     </p>
   );
 }
@@ -43,6 +74,7 @@ export function NarrativeDisplay() {
   const history = state.narrativeHistory;
   const pastEntries = history.slice(0, -1);
   const currentEntry = history[history.length - 1];
+  const isNewCampaign = state.isProcessing && !state.turnsPlayed;
 
   return (
     <div
@@ -59,19 +91,10 @@ export function NarrativeDisplay() {
         <HistoryEntry key={entry.id} text={entry.text} />
       ))}
 
-      {currentEntry && (
-        <CurrentEntry text={currentEntry.text} isProcessing={false} />
-      )}
+      {currentEntry && <CurrentEntry text={currentEntry.text} />}
 
-      {state.isProcessing && !currentEntry && (
-        <CurrentEntry text="" isProcessing={true} />
-      )}
-
-      {state.isProcessing && currentEntry && (
-        <p className="text-[#6644aa] text-sm mt-2">
-          The DM stirs in the neon dark
-          <span className="cursor-blink text-[#00ffcc]">▌</span>
-        </p>
+      {state.isProcessing && (
+        <DmThinking isNewCampaign={isNewCampaign} />
       )}
     </div>
   );

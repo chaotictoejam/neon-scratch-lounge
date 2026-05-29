@@ -12,9 +12,11 @@ import { ClassSelectorModal } from "./components/ClassSelector/ClassSelectorModa
 import { ContinueGameModal } from "./components/ClassSelector/ContinueGameModal";
 import { useWorkflowAnimation } from "./hooks/useWorkflowAnimation";
 import { useGame } from "./context/GameContext";
+import { useMechanics } from "./context/MechanicsContext";
 
 function AppInner() {
   const { state, dispatch } = useGame();
+  const { dispatch: mechDispatch } = useMechanics();
 
   // If there's a saved campaign on load, ask to continue or start fresh
   const [showContinueModal, setShowContinueModal] = useState(!!state.campaignId);
@@ -27,6 +29,7 @@ function AppInner() {
   const handleNewGameFromContinue = () => {
     setShowContinueModal(false);
     dispatch({ type: "RESET" });
+    mechDispatch({ type: "RESET_WORKFLOW" });
     setShowClassSelector(true);
   };
 

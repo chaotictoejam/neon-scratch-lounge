@@ -28,7 +28,7 @@ export class ApiStack extends cdk.Stack {
       entry: path.join(__dirname, "../../lambda/demo/inject-failure.ts"),
       handler: "injectHandler",
       runtime: lambda.Runtime.NODEJS_LATEST,
-      timeout: cdk.Duration.seconds(10),
+      timeout: cdk.Duration.seconds(30),
       bundling: demoBundling,
       environment: {
         EXECUTE_TOOL_FUNCTION_NAME: props.executeToolFunctionName,
@@ -61,7 +61,7 @@ export class ApiStack extends cdk.Stack {
       entry: path.join(__dirname, "../../lambda/demo/inject-failure.ts"),
       handler: "clearHandler",
       runtime: lambda.Runtime.NODEJS_LATEST,
-      timeout: cdk.Duration.seconds(10),
+      timeout: cdk.Duration.seconds(30),
       bundling: demoBundling,
       environment: {
         EXECUTE_TOOL_FUNCTION_NAME: props.executeToolFunctionName,
@@ -106,13 +106,13 @@ export class ApiStack extends cdk.Stack {
     const injectResource = demoResource.addResource("inject-failure");
     injectResource.addMethod(
       "POST",
-      new apigw.LambdaIntegration(injectFailureFn, { proxy: true })
+      new apigw.LambdaIntegration(injectFailureFn, { proxy: true, timeout: cdk.Duration.seconds(29) })
     );
 
     const clearResource = demoResource.addResource("clear-failure");
     clearResource.addMethod(
       "POST",
-      new apigw.LambdaIntegration(clearFailureFn, { proxy: true })
+      new apigw.LambdaIntegration(clearFailureFn, { proxy: true, timeout: cdk.Duration.seconds(29) })
     );
 
     const logsResource = demoResource.addResource("logs");

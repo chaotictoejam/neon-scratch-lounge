@@ -57,7 +57,7 @@ async function rollDice(args: Record<string, unknown>, campaign: Campaign): Prom
 
 async function applyDamage(args: Record<string, unknown>, campaign: Campaign): Promise<DamageResult> {
   const targetType = String(args.targetType ?? "player");
-  const rawDamage = Number(args.damage ?? 0);
+  const rawDamage = Number(args.amount ?? args.damage ?? 0);
   const damageType = String(args.damageType ?? "unknown");
 
   if (targetType !== "player") {

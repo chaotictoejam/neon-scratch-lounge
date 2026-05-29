@@ -21,21 +21,13 @@ export function useApi() {
     return () => window.removeEventListener("keydown", handler);
   }, [mechDispatch]);
 
-  // Auto-disable failure injection after 3 seconds
-  useEffect(() => {
-    if (!mechState.failureInjectionActive) return;
-    const id = setTimeout(() => {
-      mechDispatch({ type: "TOGGLE_FAILURE_INJECTION" });
-      clearFailure().catch((e) => console.warn("Failed to clear failure injection:", e));
-    }, 3000);
-    return () => clearTimeout(id);
-  }, [mechState.failureInjectionActive, mechDispatch]);
-
   const submitAction = useCallback(
     async (action: string, characterClass?: CharacterClass) => {
       if (gameState.isProcessing) return;
 
       const turnId = uuidv4();
+      const wasFailureInjected = mechState.failureInjectionActive;
+
       if (characterClass) {
         gameDispatch({ type: "NEW_GAME_STARTED", characterClass });
       } else {
@@ -44,10 +36,9 @@ export function useApi() {
       mechDispatch({ type: "RESET_WORKFLOW" });
 
       try {
-        if (mechState.failureInjectionActive) {
+        if (wasFailureInjected) {
           await injectFailure().catch((e) => console.warn("Failed to inject failure:", e));
           mechDispatch({ type: "INCREMENT_DLQ" });
-          // Dramatic retry animation for ExecuteTools
           mechDispatch({ type: "STEP_RETRY", stepName: "ExecuteTools", attempt: 1, maxRetries: 3 });
           mechDispatch({ type: "INCREMENT_RETRY" });
         }
@@ -85,7 +76,6 @@ export function useApi() {
         }
       } catch (err) {
         console.error("Turn failed:", err);
-        // Mark current running step as failed
         gameDispatch({
           type: "TURN_COMPLETE",
           response: {
@@ -110,6 +100,11 @@ export function useApi() {
             turnsPlayed: gameState.turnsPlayed,
           },
         });
+      } finally {
+        if (wasFailureInjected) {
+          mechDispatch({ type: "TOGGLE_FAILURE_INJECTION" });
+          await clearFailure().catch((e) => console.warn("Failed to clear failure injection:", e));
+        }
       }
     },
     [gameState, gameDispatch, mechDispatch, mechState.failureInjectionActive]
