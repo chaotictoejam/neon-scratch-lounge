@@ -9,7 +9,7 @@ import {
 import { getCachedResult, setCachedResult, makeIdempotencyKey } from "../shared/idempotency";
 import { log, logError } from "../shared/logger";
 
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
 const CAMPAIGNS_TABLE = process.env.CAMPAIGNS_TABLE!;
 const XP_PER_LEVEL = parseInt(process.env.XP_PER_LEVEL ?? "100", 10);
 
