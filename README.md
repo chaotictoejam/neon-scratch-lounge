@@ -1,4 +1,4 @@
-# The Neon Scratch Lounge
+# The Neon Scratch Lounge (Demo for AWS Summit, Los Angeles)
 
 **Neo-Pawsburg, 2087.** A cyberpunk cat RPG running on production-grade AWS infrastructure — demonstrating five reliability patterns with an AI Dungeon Master powered by Amazon Bedrock.
 
