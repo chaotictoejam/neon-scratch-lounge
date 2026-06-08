@@ -273,3 +273,9 @@ npx cdk destroy --all
 ```
 
 S3 buckets and DynamoDB tables use `RemovalPolicy.DESTROY` for easy teardown.
+
+---
+
+## TODO
+
+- **Item stat bonuses** — inventory is currently a flat string array; equipping gear (e.g. `HackingClaws`) does not modify `playerStats`. Add a static item registry in `execute-tool.ts` that applies/reverses stat deltas on pickup/drop (auto-equip on pickup first, then explicit equip action).
