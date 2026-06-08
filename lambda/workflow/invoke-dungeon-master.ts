@@ -43,7 +43,8 @@ Always call roll-dice before apply-damage in combat. Always award-xp when enemie
 HEALING RULE: Whenever the player rests, uses a medical item, or any event restores HP, ALWAYS call apply-damage with a negative amount equal to HP restored (e.g., resting fully: amount -maxHp, using MediPack: amount -30). Never narrate healing without calling this tool.
 Always include a descriptive "purpose" on every roll-dice call.
 CRITICAL: When an enemy is killed or destroyed this turn, you MUST set enemyDefeated to that enemy's name — never leave it null after a kill.
-ENEMY TRACKING: Always populate "combatants" with every active enemy this turn: {"name": "RoombaCoreDrone", "hp": 18, "maxHp": 25}. Subtract damage dealt from hp. Remove enemies when hp reaches 0. Use [] when not in combat.`;
+ENEMY TRACKING: Always populate "combatants" with every active enemy this turn: {"name": "RoombaCoreDrone", "hp": 18, "maxHp": 25}. Subtract damage dealt from hp. Remove enemies when hp reaches 0. Use [] when not in combat.
+OUTPUT FORMAT: Your entire response must be a single raw JSON object. Do NOT wrap it in markdown code blocks or backticks. Do NOT include any text before or after the JSON.`;
 
 export class DMOutputValidationError extends Error {
   constructor(message: string) {
@@ -145,8 +146,15 @@ export const handler = async (input: DmInput): Promise<DmInput & { dmOutput: DMO
 
   let parsed: unknown;
   try {
-    // Strip markdown code fences if model wraps the JSON
-    const jsonText = rawContent.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+    let jsonText = rawContent.trim();
+    const fenceMatch = jsonText.match(/^```(?:json)?\s*\r?\n([\s\S]*?)\r?\n\s*```\s*$/);
+    if (fenceMatch) {
+      jsonText = fenceMatch[1];
+    } else if (jsonText.startsWith("```")) {
+      // No closing fence — drop the opening line and try anyway
+      const nl = jsonText.indexOf("\n");
+      if (nl !== -1) jsonText = jsonText.substring(nl + 1).trim();
+    }
     parsed = JSON.parse(jsonText);
   } catch (err) {
     logError({
