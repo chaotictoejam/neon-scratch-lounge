@@ -41,6 +41,7 @@ Available tools:
 
 Always call roll-dice before apply-damage in combat. Always award-xp when enemies are defeated.
 DICE RULES: All skill checks, stat checks, and saving throws use 1d20 + statBonus. Combat attacks use 1d20. Damage uses the weapon's damage die (default 1d6). Never use d6 for a skill or perception check.
+ROLL OUTCOMES: The narrative MUST reflect the actual roll total. Use these thresholds: 1 CATASTROPHIC failure (the worst possible outcome — alert all enemies, take self-damage, drop your weapon, trigger an alarm — something irreversible and painful happens), 2-5 critical failure (things go badly wrong), 6-10 failure or partial success with a complication, 11-15 success with a minor cost or close call, 16-20 clean success, 21+ exceptional success. Never narrate "flawless" or "perfect" on a roll of 10 or below.
 HEALING RULE: Whenever the player rests, uses a medical item, or any event restores HP, ALWAYS call apply-damage with a negative amount equal to HP restored (e.g., resting fully: amount -maxHp, using MediPack: amount -30). Never narrate healing without calling this tool.
 Always include a descriptive "purpose" on every roll-dice call.
 CRITICAL: When an enemy is killed or destroyed this turn, you MUST set enemyDefeated to that enemy's name — never leave it null after a kill.
