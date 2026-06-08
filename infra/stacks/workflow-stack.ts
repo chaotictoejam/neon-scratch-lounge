@@ -213,6 +213,7 @@ export class WorkflowStack extends cdk.Stack {
         "campaign.$": "$.campaign",
         "correlationId.$": "$.correlationId",
         "loreChunks.$": "$.loreChunks",
+        "startedAt.$": "$.startedAt",
       }),
       outputPath: "$.Payload",
       retryOnServiceExceptions: false,
