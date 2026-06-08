@@ -165,12 +165,18 @@ export class WorkflowStack extends cdk.Stack {
     }));
 
     // format-response Lambda
+    const formatResponseLogGroup = new logs.LogGroup(this, "FormatResponseLogGroup", {
+      logGroupName: "/aws/lambda/neon-scratch-format-response",
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
     const formatResponseFn = new lambdaNodejs.NodejsFunction(this, "FormatResponse", {
       ...commonLambdaProps,
       functionName: "neon-scratch-format-response",
       entry: path.join(__dirname, "../../lambda/workflow/format-response.ts"),
       timeout: cdk.Duration.seconds(10),
       environment: { ...commonEnv, TURN_RESULTS_TABLE: props.turnResultsTable.tableName },
+      logGroup: formatResponseLogGroup,
     });
     props.turnResultsTable.grantWriteData(formatResponseFn);
 
@@ -217,6 +223,13 @@ export class WorkflowStack extends cdk.Stack {
       maxAttempts: retries.maxAttempts,
       interval: cdk.Duration.seconds(retries.intervalSeconds),
       backoffRate: retries.backoffRate,
+      jitterStrategy: sfn.JitterType.FULL,
+    });
+    invokeDmTask.addRetry({
+      errors: ["States.Timeout"],
+      maxAttempts: 2,
+      interval: cdk.Duration.seconds(3),
+      backoffRate: 2.0,
       jitterStrategy: sfn.JitterType.FULL,
     });
 
@@ -285,6 +298,23 @@ export class WorkflowStack extends cdk.Stack {
       retryOnServiceExceptions: false,
     });
 
+    // Write status: "error" to DynamoDB when the workflow fails before format-response
+    const writeErrorResult = new tasks.DynamoUpdateItem(this, "WriteErrorResult", {
+      table: props.turnResultsTable,
+      key: {
+        turnId: tasks.DynamoAttributeValue.fromString(sfn.JsonPath.stringAt("$.correlationId")),
+      },
+      updateExpression: "SET #s = :s",
+      expressionAttributeNames: { "#s": "status" },
+      expressionAttributeValues: {
+        ":s": tasks.DynamoAttributeValue.fromString("error"),
+      },
+      resultPath: sfn.JsonPath.DISCARD,
+    });
+    retrieveLoreTask.addCatch(writeErrorResult, { errors: ["States.ALL"], resultPath: "$.error" });
+    invokeDmTask.addCatch(writeErrorResult, { errors: ["States.ALL"], resultPath: "$.error" });
+    persistCampaignTask.addCatch(writeErrorResult, { errors: ["States.ALL"], resultPath: "$.error" });
+
     // Chain the workflow
     const definition = retrieveLoreTask
       .next(invokeDmTask)
@@ -319,6 +349,7 @@ export class WorkflowStack extends cdk.Stack {
     persistCampaignFn.grantInvoke(this.stateMachine);
     formatResponseFn.grantInvoke(this.stateMachine);
     this.dlq.grantSendMessages(this.stateMachine);
+    props.turnResultsTable.grantWriteData(this.stateMachine);
 
     // Dungeon Controller Lambda — receives player actions, publishes to EventBridge
     const controllerLogGroup = new logs.LogGroup(this, "ControllerLogGroup", {
@@ -355,36 +386,15 @@ export class WorkflowStack extends cdk.Stack {
       resources: [eventBus.eventBusArn],
     }));
 
-    // EventBridge rule — PlayerAction → start Step Functions execution
-    const sfnRole = new iam.Role(this, "EventBridgeSfnRole", {
-      assumedBy: new iam.ServicePrincipal("events.amazonaws.com"),
-      inlinePolicies: {
-        StartExecution: new iam.PolicyDocument({
-          statements: [
-            new iam.PolicyStatement({
-              effect: iam.Effect.ALLOW,
-              actions: ["states:StartExecution"],
-              resources: [this.stateMachine.stateMachineArn],
-            }),
-          ],
-        }),
-      },
-    });
-
+    // EventBridge rule — audit only, no target (workflow is started directly by the controller)
     new events.Rule(this, "PlayerActionRule", {
       eventBus,
       ruleName: "neon-scratch-player-action",
-      description: "Routes PlayerAction events to the dungeon workflow",
+      description: "Captures PlayerAction events for audit trail",
       eventPattern: {
         source: ["neon-scratch-lounge"],
         detailType: ["PlayerAction"],
       },
-      targets: [
-        new eventTargets.SfnStateMachine(this.stateMachine, {
-          role: sfnRole,
-          input: events.RuleTargetInput.fromEventPath("$.detail"),
-        }),
-      ],
     });
 
     // Outputs

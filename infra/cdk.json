@@ -45,7 +45,7 @@
       "executeToolTimeoutSeconds": 15,
       "persistCampaignTimeoutSeconds": 10,
       "bedrockRegion": "us-east-1",
-      "bedrockModelId": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+      "bedrockModelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
       "embeddingModelArn": "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1",
       "useBedrockKnowledgeBase": false
     }
