@@ -40,6 +40,7 @@ Available tools:
 - update-quest-log: {entry}
 
 Always call roll-dice before apply-damage in combat. Always award-xp when enemies are defeated.
+DICE RULES: All skill checks, stat checks, and saving throws use 1d20 + statBonus. Combat attacks use 1d20. Damage uses the weapon's damage die (default 1d6). Never use d6 for a skill or perception check.
 HEALING RULE: Whenever the player rests, uses a medical item, or any event restores HP, ALWAYS call apply-damage with a negative amount equal to HP restored (e.g., resting fully: amount -maxHp, using MediPack: amount -30). Never narrate healing without calling this tool.
 Always include a descriptive "purpose" on every roll-dice call.
 CRITICAL: When an enemy is killed or destroyed this turn, you MUST set enemyDefeated to that enemy's name — never leave it null after a kill.
@@ -146,16 +147,12 @@ export const handler = async (input: DmInput): Promise<DmInput & { dmOutput: DMO
 
   let parsed: unknown;
   try {
-    let jsonText = rawContent.trim();
-    const fenceMatch = jsonText.match(/^```(?:json)?\s*\r?\n([\s\S]*?)\r?\n\s*```\s*$/);
-    if (fenceMatch) {
-      jsonText = fenceMatch[1];
-    } else if (jsonText.startsWith("```")) {
-      // No closing fence — drop the opening line and try anyway
-      const nl = jsonText.indexOf("\n");
-      if (nl !== -1) jsonText = jsonText.substring(nl + 1).trim();
+    const start = rawContent.indexOf("{");
+    const end = rawContent.lastIndexOf("}");
+    if (start === -1 || end === -1 || end <= start) {
+      throw new SyntaxError("No JSON object found in response");
     }
-    parsed = JSON.parse(jsonText);
+    parsed = JSON.parse(rawContent.substring(start, end + 1));
   } catch (err) {
     logError({
       requestId: input.correlationId,
