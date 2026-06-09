@@ -1,7 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as events from "aws-cdk-lib/aws-events";
-import * as eventTargets from "aws-cdk-lib/aws-events-targets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
@@ -237,15 +236,22 @@ export class WorkflowStack extends cdk.Stack {
       jitterStrategy: sfn.JitterType.FULL,
     });
 
-    // Safe narrative fallback state for DLQ catch
+    // Safe narrative fallback — merges dmOutput into existing state so FormatResponse can run normally
     const safeNarrativeState = new sfn.Pass(this, "ReturnSafeNarrative", {
-      result: sfn.Result.fromObject({
-        narrative:
-          "The neon flickers and goes dark for a moment. The city holds its breath. Your campaign continues, operative — but the system needs a moment to recover. Try your action again.",
+      parameters: {
+        narrative: "The neon flickers and goes dark for a moment. The city holds its breath. Your campaign continues, operative — but the system needs a moment to recover. Try your action again.",
+        "characterName.$": "$.campaign.characterName",
+        toolCalls: [],
+        nextLocation: null,
+        questUpdate: null,
+        combatOccurred: false,
+        enemyDefeated: null,
+        combatants: [],
         gameOver: false,
         gameOverReason: null,
-        error: true,
-      }),
+        dmInternalNote: "DLQ safe narrative fallback",
+      },
+      resultPath: "$.dmOutput",
     });
 
     // Send to DLQ
@@ -253,8 +259,6 @@ export class WorkflowStack extends cdk.Stack {
       queue: this.dlq,
       messageBody: sfn.TaskInput.fromJsonPathAt("$"),
     });
-
-    const dlqAndRecover = sendToDlqTask.next(safeNarrativeState);
 
     const persistCampaignTask = new tasks.LambdaInvoke(this, "PersistCampaignTask", {
       lambdaFunction: persistCampaignFn,
@@ -268,6 +272,9 @@ export class WorkflowStack extends cdk.Stack {
       outputPath: "$.Payload",
       retryOnServiceExceptions: false,
     });
+
+    // DLQ path: send failed state to queue, inject safe narrative, then run FormatResponse normally
+    const dlqAndRecover = sendToDlqTask.next(safeNarrativeState).next(formatResponseTask);
 
     // Write status: "error" to DynamoDB when the workflow fails before format-response
     const writeErrorResult = new tasks.DynamoUpdateItem(this, "WriteErrorResult", {
@@ -283,7 +290,7 @@ export class WorkflowStack extends cdk.Stack {
       resultPath: sfn.JsonPath.DISCARD,
     });
     retrieveLoreTask.addCatch(writeErrorResult, { errors: ["States.ALL"], resultPath: "$.error" });
-    invokeDmTask.addCatch(writeErrorResult, { errors: ["States.ALL"], resultPath: "$.error" });
+    invokeDmTask.addCatch(dlqAndRecover, { errors: ["States.ALL"], resultPath: "$.error" });
     persistCampaignTask.addCatch(writeErrorResult, { errors: ["States.ALL"], resultPath: "$.error" });
 
     // Chain the workflow — invoke-dm now runs the agentic tool-use loop internally
