@@ -17,16 +17,21 @@ export interface WorkflowStackProps extends cdk.StackProps {
   toolResultsTable: dynamodb.Table;
   turnResultsTable: dynamodb.Table;
   knowledgeBaseId?: string;
+  envName?: string;
 }
 
 export class WorkflowStack extends cdk.Stack {
   public readonly dungeonControllerFunction: lambda.Function;
   public readonly executeToolFunction: lambda.Function;
+  public readonly invokeDmFunction: lambda.Function;
   public readonly stateMachine: sfn.StateMachine;
   public readonly dlq: sqs.Queue;
 
   constructor(scope: Construct, id: string, props: WorkflowStackProps) {
     super(scope, id, props);
+
+    const envName = props.envName ?? "prod";
+    const s = envName === "prod" ? "" : `-${envName}`;
 
     const config = this.node.tryGetContext("neonScratch") ?? {};
     const bedrockRegion: string = config.bedrockRegion ?? "us-east-1";
@@ -41,8 +46,7 @@ export class WorkflowStack extends cdk.Stack {
 
     const timeouts = {
       retrieveLore: config.retrieveLoreTimeoutSeconds ?? 10,
-      invokeDm: config.invokeDmTimeoutSeconds ?? 30,
-      validateRoute: config.validateRouteTimeoutSeconds ?? 5,
+      invokeDm: config.invokeDmTimeoutSeconds ?? 90, // agentic loop: multiple Bedrock calls
       executeTool: config.executeToolTimeoutSeconds ?? 15,
       persistCampaign: config.persistCampaignTimeoutSeconds ?? 10,
     };
@@ -55,7 +59,7 @@ export class WorkflowStack extends cdk.Stack {
 
     // Dead Letter Queue
     this.dlq = new sqs.Queue(this, "DungeonDlq", {
-      queueName: "neon-scratch-dungeon-dlq",
+      queueName: `neon-scratch-dungeon-dlq${s}`,
       retentionPeriod: cdk.Duration.days(14),
     });
 
@@ -90,7 +94,7 @@ export class WorkflowStack extends cdk.Stack {
     // retrieve-lore Lambda
     const retrieveLoreFn = new lambdaNodejs.NodejsFunction(this, "RetrieveLore", {
       ...commonLambdaProps,
-      functionName: "neon-scratch-retrieve-lore",
+      functionName: `neon-scratch-retrieve-lore${s}`,
       entry: path.join(__dirname, "../../lambda/workflow/retrieve-lore.ts"),
       timeout: cdk.Duration.seconds(timeouts.retrieveLore + 5),
       environment: commonEnv,
@@ -98,18 +102,19 @@ export class WorkflowStack extends cdk.Stack {
 
     // invoke-dungeon-master Lambda
     const invokeDmLogGroup = new logs.LogGroup(this, "DmLogGroup", {
-      logGroupName: "/aws/lambda/neon-scratch-invoke-dungeon-master",
+      logGroupName: `/aws/lambda/neon-scratch-invoke-dungeon-master${s}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     const invokeDmFn = new lambdaNodejs.NodejsFunction(this, "InvokeDungeonMaster", {
       ...commonLambdaProps,
-      functionName: "neon-scratch-invoke-dungeon-master",
+      functionName: `neon-scratch-invoke-dungeon-master${s}`,
       entry: path.join(__dirname, "../../lambda/workflow/invoke-dungeon-master.ts"),
       timeout: cdk.Duration.seconds(timeouts.invokeDm + 5),
       environment: commonEnv,
       logGroup: invokeDmLogGroup,
     });
+    this.invokeDmFunction = invokeDmFn;
     invokeDmFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["bedrock:InvokeModel"],
@@ -119,24 +124,15 @@ export class WorkflowStack extends cdk.Stack {
       ],
     }));
 
-    // validate-and-route Lambda
-    const validateRouteFn = new lambdaNodejs.NodejsFunction(this, "ValidateAndRoute", {
-      ...commonLambdaProps,
-      functionName: "neon-scratch-validate-and-route",
-      entry: path.join(__dirname, "../../lambda/workflow/validate-and-route.ts"),
-      timeout: cdk.Duration.seconds(timeouts.validateRoute + 5),
-      environment: commonEnv,
-    });
-
-    // execute-tool Lambda (also exposed as public for demo failure injection)
+    // execute-tool Lambda — kept for demo failure injection (not part of main workflow)
     const executeToolLogGroup = new logs.LogGroup(this, "ExecuteToolLogGroup", {
-      logGroupName: "/aws/lambda/neon-scratch-execute-tool",
+      logGroupName: `/aws/lambda/neon-scratch-execute-tool${s}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     const executeToolFn = new lambdaNodejs.NodejsFunction(this, "ExecuteTool", {
       ...commonLambdaProps,
-      functionName: "neon-scratch-execute-tool",
+      functionName: `neon-scratch-execute-tool${s}`,
       entry: path.join(__dirname, "../../lambda/workflow/execute-tool.ts"),
       timeout: cdk.Duration.seconds(timeouts.executeTool + 5),
       environment: commonEnv,
@@ -149,7 +145,7 @@ export class WorkflowStack extends cdk.Stack {
     // persist-campaign Lambda
     const persistCampaignFn = new lambdaNodejs.NodejsFunction(this, "PersistCampaign", {
       ...commonLambdaProps,
-      functionName: "neon-scratch-persist-campaign",
+      functionName: `neon-scratch-persist-campaign${s}`,
       entry: path.join(__dirname, "../../lambda/workflow/persist-campaign.ts"),
       timeout: cdk.Duration.seconds(timeouts.persistCampaign + 5),
       environment: commonEnv,
@@ -166,13 +162,13 @@ export class WorkflowStack extends cdk.Stack {
 
     // format-response Lambda
     const formatResponseLogGroup = new logs.LogGroup(this, "FormatResponseLogGroup", {
-      logGroupName: "/aws/lambda/neon-scratch-format-response",
+      logGroupName: `/aws/lambda/neon-scratch-format-response${s}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     const formatResponseFn = new lambdaNodejs.NodejsFunction(this, "FormatResponse", {
       ...commonLambdaProps,
-      functionName: "neon-scratch-format-response",
+      functionName: `neon-scratch-format-response${s}`,
       entry: path.join(__dirname, "../../lambda/workflow/format-response.ts"),
       timeout: cdk.Duration.seconds(10),
       environment: { ...commonEnv, TURN_RESULTS_TABLE: props.turnResultsTable.tableName },
@@ -189,10 +185,10 @@ export class WorkflowStack extends cdk.Stack {
       }));
     }
 
-    // Grant read access to retrieve-lore and invoke-dm (read campaigns for context)
+    // Grant read access to retrieve-lore; invoke-dm needs full read/write for inline tool execution
     props.campaignsTable.grantReadData(retrieveLoreFn);
-    props.campaignsTable.grantReadData(invokeDmFn);
-    props.campaignsTable.grantReadData(validateRouteFn);
+    props.campaignsTable.grantReadWriteData(invokeDmFn);
+    props.toolResultsTable.grantReadWriteData(invokeDmFn);
 
     // Step Functions state definitions
     const retrieveLoreTask = new tasks.LambdaInvoke(this, "RetrieveLoreTask", {
@@ -227,18 +223,18 @@ export class WorkflowStack extends cdk.Stack {
       jitterStrategy: sfn.JitterType.FULL,
     });
     invokeDmTask.addRetry({
+      errors: ["DemoForcedFailure"],
+      maxAttempts: retries.maxAttempts,
+      interval: cdk.Duration.seconds(retries.intervalSeconds),
+      backoffRate: retries.backoffRate,
+      jitterStrategy: sfn.JitterType.FULL,
+    });
+    invokeDmTask.addRetry({
       errors: ["States.Timeout"],
       maxAttempts: 2,
       interval: cdk.Duration.seconds(3),
       backoffRate: 2.0,
       jitterStrategy: sfn.JitterType.FULL,
-    });
-
-    const validateRouteTask = new tasks.LambdaInvoke(this, "ValidateAndRouteTask", {
-      lambdaFunction: validateRouteFn,
-      outputPath: "$.Payload",
-      retryOnServiceExceptions: false,
-      taskTimeout: sfn.Timeout.duration(cdk.Duration.seconds(timeouts.validateRoute)),
     });
 
     // Safe narrative fallback state for DLQ catch
@@ -259,32 +255,6 @@ export class WorkflowStack extends cdk.Stack {
     });
 
     const dlqAndRecover = sendToDlqTask.next(safeNarrativeState);
-
-    // Execute tools as a Map state iterating over validated tool calls
-    const executeToolTask = new tasks.LambdaInvoke(this, "ExecuteToolTask", {
-      lambdaFunction: executeToolFn,
-      outputPath: "$.Payload",
-      retryOnServiceExceptions: false,
-      taskTimeout: sfn.Timeout.duration(cdk.Duration.seconds(timeouts.executeTool)),
-    });
-    executeToolTask.addRetry({
-      errors: ["States.TaskFailed", "States.Timeout"],
-      maxAttempts: retries.maxAttempts,
-      interval: cdk.Duration.seconds(retries.intervalSeconds),
-      backoffRate: retries.backoffRate,
-      jitterStrategy: sfn.JitterType.FULL,
-    });
-    executeToolTask.addCatch(dlqAndRecover, {
-      errors: ["States.ALL"],
-      resultPath: "$.error",
-    });
-
-    const executeToolsMap = new sfn.Map(this, "ExecuteToolsMap", {
-      itemsPath: "$.validatedToolCalls",
-      resultPath: "$.toolResults",
-      maxConcurrency: 1,
-    });
-    executeToolsMap.itemProcessor(executeToolTask);
 
     const persistCampaignTask = new tasks.LambdaInvoke(this, "PersistCampaignTask", {
       lambdaFunction: persistCampaignFn,
@@ -316,24 +286,22 @@ export class WorkflowStack extends cdk.Stack {
     invokeDmTask.addCatch(writeErrorResult, { errors: ["States.ALL"], resultPath: "$.error" });
     persistCampaignTask.addCatch(writeErrorResult, { errors: ["States.ALL"], resultPath: "$.error" });
 
-    // Chain the workflow
+    // Chain the workflow — invoke-dm now runs the agentic tool-use loop internally
     const definition = retrieveLoreTask
       .next(invokeDmTask)
-      .next(validateRouteTask)
-      .next(executeToolsMap)
       .next(persistCampaignTask)
       .next(formatResponseTask);
 
     // Step Functions Express Workflow
     this.stateMachine = new sfn.StateMachine(this, "DungeonWorkflow", {
-      stateMachineName: "neon-scratch-dungeon-workflow",
+      stateMachineName: `neon-scratch-dungeon-workflow${s}`,
       definitionBody: sfn.DefinitionBody.fromChainable(definition),
       stateMachineType: sfn.StateMachineType.EXPRESS,
-      timeout: cdk.Duration.seconds(120),
+      timeout: cdk.Duration.seconds(180),
       tracingEnabled: true,
       logs: {
         destination: new cdk.aws_logs.LogGroup(this, "StateMachineLogs", {
-          logGroupName: "/aws/states/neon-scratch-dungeon",
+          logGroupName: `/aws/states/neon-scratch-dungeon${s}`,
           retention: cdk.aws_logs.RetentionDays.ONE_WEEK,
           removalPolicy: cdk.RemovalPolicy.DESTROY,
         }),
@@ -345,8 +313,6 @@ export class WorkflowStack extends cdk.Stack {
     // Grant state machine permissions
     retrieveLoreFn.grantInvoke(this.stateMachine);
     invokeDmFn.grantInvoke(this.stateMachine);
-    validateRouteFn.grantInvoke(this.stateMachine);
-    executeToolFn.grantInvoke(this.stateMachine);
     persistCampaignFn.grantInvoke(this.stateMachine);
     formatResponseFn.grantInvoke(this.stateMachine);
     this.dlq.grantSendMessages(this.stateMachine);
@@ -354,18 +320,18 @@ export class WorkflowStack extends cdk.Stack {
 
     // Dungeon Controller Lambda — receives player actions, publishes to EventBridge
     const controllerLogGroup = new logs.LogGroup(this, "ControllerLogGroup", {
-      logGroupName: "/aws/lambda/neon-scratch-dungeon-controller",
+      logGroupName: `/aws/lambda/neon-scratch-dungeon-controller${s}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     this.dungeonControllerFunction = new lambdaNodejs.NodejsFunction(this, "DungeonController", {
       ...commonLambdaProps,
-      functionName: "neon-scratch-dungeon-controller",
+      functionName: `neon-scratch-dungeon-controller${s}`,
       entry: path.join(__dirname, "../../lambda/dungeon-controller/index.ts"),
       timeout: cdk.Duration.seconds(10),
       environment: {
         ...commonEnv,
-        EVENT_BUS_NAME: "neon-scratch-events",
+        EVENT_BUS_NAME: `neon-scratch-events${s}`,
         STATE_MACHINE_ARN: this.stateMachine.stateMachineArn,
         TURN_RESULTS_TABLE: props.turnResultsTable.tableName,
       },
@@ -377,7 +343,7 @@ export class WorkflowStack extends cdk.Stack {
 
     // EventBridge custom bus
     const eventBus = new events.EventBus(this, "NeonScratchEventBus", {
-      eventBusName: "neon-scratch-events",
+      eventBusName: `neon-scratch-events${s}`,
     });
 
     // Grant controller permission to put events
@@ -390,7 +356,7 @@ export class WorkflowStack extends cdk.Stack {
     // EventBridge rule — audit only, no target (workflow is started directly by the controller)
     new events.Rule(this, "PlayerActionRule", {
       eventBus,
-      ruleName: "neon-scratch-player-action",
+      ruleName: `neon-scratch-player-action${s}`,
       description: "Captures PlayerAction events for audit trail",
       eventPattern: {
         source: ["neon-scratch-lounge"],

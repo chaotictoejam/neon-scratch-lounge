@@ -2,11 +2,7 @@ import { CloudWatchLogsClient, StartQueryCommand, GetQueryResultsCommand } from 
 
 const cwl = new CloudWatchLogsClient({});
 
-const LOG_GROUPS = [
-  "/aws/lambda/neon-scratch-dungeon-controller",
-  "/aws/lambda/neon-scratch-execute-tool",
-  "/aws/lambda/neon-scratch-invoke-dungeon-master",
-];
+const LOG_GROUPS = (process.env.LOG_GROUPS ?? "").split(",").filter(Boolean);
 
 const HEADERS = {
   "Content-Type": "application/json",
@@ -27,7 +23,7 @@ export const handler = async (event: ProxyEvent) => {
   const startTime = endTime - 7200; // last 2 hours
 
   const queryString = `
-    fields @timestamp, campaignId, latencyMs, toolName, total as diceResult, inputTokens, outputTokens, success, retryCount, newHp, previousHp, @message
+    fields @timestamp, campaignId, latencyMs, toolName, total as diceResult, inputTokens, outputTokens, success, retryCount, newHp, previousHp, level, error, @message
     | filter campaignId = "${campaignId.replace(/[^a-zA-Z0-9\-]/g, "")}"
     | sort @timestamp asc
     | limit 100

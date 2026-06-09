@@ -39,7 +39,7 @@ export function useApi() {
         if (wasFailureInjected) {
           await injectFailure().catch((e) => console.warn("Failed to inject failure:", e));
           mechDispatch({ type: "INCREMENT_DLQ" });
-          mechDispatch({ type: "STEP_RETRY", stepName: "ExecuteTools", attempt: 1, maxRetries: 3 });
+          mechDispatch({ type: "STEP_RETRY", stepName: "InvokeDungeonMaster", attempt: 1, maxRetries: 3 });
           mechDispatch({ type: "INCREMENT_RETRY" });
         }
 
@@ -54,7 +54,7 @@ export function useApi() {
           mechDispatch({ type: "UPDATE_WORKFLOW", steps: response.workflowTrace });
         } else {
           // Mark all as done with estimated times when trace not available
-          ["RetrieveLore", "InvokeDungeonMaster", "ValidateAndRoute", "ExecuteTools", "PersistCampaign", "FormatResponse"].forEach((name) => {
+          ["RetrieveLore", "InvokeDungeonMaster", "PersistCampaign", "FormatResponse"].forEach((name) => {
             mechDispatch({ type: "STEP_DONE", stepName: name, durationMs: 0 });
           });
         }

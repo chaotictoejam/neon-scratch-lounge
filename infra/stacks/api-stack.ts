@@ -9,8 +9,9 @@ import * as path from "path";
 
 export interface ApiStackProps extends cdk.StackProps {
   dungeonControllerFunction: lambda.Function;
-  executeToolFunctionName: string;
+  invokeDmFunctionName: string;
   turnResultsTable: dynamodb.Table;
+  envName?: string;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -19,38 +20,47 @@ export class ApiStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
 
+    const envName = props.envName ?? "prod";
+    const s = envName === "prod" ? "" : `-${envName}`;
+
     const demoBundling: lambdaNodejs.BundlingOptions = {
       forceDockerBundling: false,
     };
 
-    // DEMO-ONLY Lambdas — inject / clear failure on execute-tool
+    // DEMO-ONLY Lambdas — inject / clear failure on invoke-dungeon-master
     // Remove these before any production deployment.
     const injectFailureFn = new lambdaNodejs.NodejsFunction(this, "InjectFailure", {
-      functionName: "neon-scratch-demo-inject-failure",
+      functionName: `neon-scratch-demo-inject-failure${s}`,
       entry: path.join(__dirname, "../../lambda/demo/inject-failure.ts"),
       handler: "injectHandler",
       runtime: lambda.Runtime.NODEJS_LATEST,
       timeout: cdk.Duration.seconds(30),
       bundling: demoBundling,
       environment: {
-        EXECUTE_TOOL_FUNCTION_NAME: props.executeToolFunctionName,
+        INVOKE_DM_FUNCTION_NAME: props.invokeDmFunctionName,
       },
     });
     injectFailureFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["lambda:GetFunctionConfiguration", "lambda:UpdateFunctionConfiguration"],
       resources: [
-        `arn:aws:lambda:${this.region}:${this.account}:function:${props.executeToolFunctionName}`,
+        `arn:aws:lambda:${this.region}:${this.account}:function:${props.invokeDmFunctionName}`,
       ],
     }));
 
     const fetchLogsFn = new lambdaNodejs.NodejsFunction(this, "FetchLogs", {
-      functionName: "neon-scratch-demo-fetch-logs",
+      functionName: `neon-scratch-demo-fetch-logs${s}`,
       entry: path.join(__dirname, "../../lambda/demo/fetch-logs.ts"),
       handler: "handler",
       runtime: lambda.Runtime.NODEJS_LATEST,
       timeout: cdk.Duration.seconds(15),
       bundling: demoBundling,
+      environment: {
+        LOG_GROUPS: [
+          `/aws/lambda/${props.dungeonControllerFunction.functionName}`,
+          `/aws/lambda/${props.invokeDmFunctionName}`,
+        ].join(","),
+      },
     });
     fetchLogsFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
@@ -59,29 +69,29 @@ export class ApiStack extends cdk.Stack {
     }));
 
     const clearFailureFn = new lambdaNodejs.NodejsFunction(this, "ClearFailure", {
-      functionName: "neon-scratch-demo-clear-failure",
+      functionName: `neon-scratch-demo-clear-failure${s}`,
       entry: path.join(__dirname, "../../lambda/demo/inject-failure.ts"),
       handler: "clearHandler",
       runtime: lambda.Runtime.NODEJS_LATEST,
       timeout: cdk.Duration.seconds(30),
       bundling: demoBundling,
       environment: {
-        EXECUTE_TOOL_FUNCTION_NAME: props.executeToolFunctionName,
+        INVOKE_DM_FUNCTION_NAME: props.invokeDmFunctionName,
       },
     });
     clearFailureFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["lambda:GetFunctionConfiguration", "lambda:UpdateFunctionConfiguration"],
       resources: [
-        `arn:aws:lambda:${this.region}:${this.account}:function:${props.executeToolFunctionName}`,
+        `arn:aws:lambda:${this.region}:${this.account}:function:${props.invokeDmFunctionName}`,
       ],
     }));
 
     const api = new apigw.RestApi(this, "NeonScratchApi", {
-      restApiName: "neon-scratch-api",
+      restApiName: `neon-scratch-api${s}`,
       description: "The Neon Scratch Lounge — API Gateway",
       deployOptions: {
-        stageName: "prod",
+        stageName: envName,
         throttlingRateLimit: 10,
         throttlingBurstLimit: 20,
       },
@@ -125,7 +135,7 @@ export class ApiStack extends cdk.Stack {
 
     // GET /action/status — poll for async turn result
     const turnStatusFn = new lambdaNodejs.NodejsFunction(this, "TurnStatus", {
-      functionName: "neon-scratch-turn-status",
+      functionName: `neon-scratch-turn-status${s}`,
       entry: path.join(__dirname, "../../lambda/dungeon-controller/status.ts"),
       handler: "handler",
       runtime: lambda.Runtime.NODEJS_LATEST,

@@ -1,7 +1,7 @@
 /**
  * DEMO-ONLY — remove before any production use.
  *
- * Sets/clears FORCE_TOOL_FAILURE env var on the execute-tool Lambda
+ * Sets/clears FORCE_TOOL_FAILURE env var on the invoke-dungeon-master Lambda
  * to trigger the Step Functions retry animation in the UI.
  *
  * clearHandler polls until the function returns to Active state so callers
@@ -14,7 +14,7 @@ import {
 } from "@aws-sdk/client-lambda";
 
 const lambda = new LambdaClient({});
-const EXECUTE_TOOL_FN = process.env.EXECUTE_TOOL_FUNCTION_NAME!;
+const INVOKE_DM_FN = process.env.INVOKE_DM_FUNCTION_NAME!;
 
 const HEADERS = {
   "Content-Type": "application/json",
@@ -25,16 +25,16 @@ async function waitForActive(maxWaitMs = 20000): Promise<void> {
   const deadline = Date.now() + maxWaitMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 800));
-    const cfg = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: EXECUTE_TOOL_FN }));
+    const cfg = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: INVOKE_DM_FN }));
     if (cfg.State === "Active") return;
   }
 }
 
 export const injectHandler = async (): Promise<{ statusCode: number; headers: typeof HEADERS; body: string }> => {
-  const config = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: EXECUTE_TOOL_FN }));
+  const config = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: INVOKE_DM_FN }));
   const env = config.Environment?.Variables ?? {};
   await lambda.send(new UpdateFunctionConfigurationCommand({
-    FunctionName: EXECUTE_TOOL_FN,
+    FunctionName: INVOKE_DM_FN,
     Environment: { Variables: { ...env, FORCE_TOOL_FAILURE: "true" } },
   }));
   await waitForActive();
@@ -42,11 +42,11 @@ export const injectHandler = async (): Promise<{ statusCode: number; headers: ty
 };
 
 export const clearHandler = async (): Promise<{ statusCode: number; headers: typeof HEADERS; body: string }> => {
-  const config = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: EXECUTE_TOOL_FN }));
+  const config = await lambda.send(new GetFunctionConfigurationCommand({ FunctionName: INVOKE_DM_FN }));
   const env = { ...(config.Environment?.Variables ?? {}) };
   delete env.FORCE_TOOL_FAILURE;
   await lambda.send(new UpdateFunctionConfigurationCommand({
-    FunctionName: EXECUTE_TOOL_FN,
+    FunctionName: INVOKE_DM_FN,
     Environment: { Variables: env },
   }));
   await waitForActive();

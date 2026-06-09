@@ -21,12 +21,19 @@ import * as path from "path";
  *                     Costs ~$701/month idle but enables semantic vector search.
  *                     Requires `amazon.titan-embed-text-v1` model access.
  */
+export interface KnowledgeBaseStackProps extends cdk.StackProps {
+  envName?: string;
+}
+
 export class KnowledgeBaseStack extends cdk.Stack {
   public readonly knowledgeBaseId: string;
   public readonly knowledgeBaseArn: string;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: KnowledgeBaseStackProps) {
     super(scope, id, props);
+
+    const envName = props?.envName ?? "prod";
+    const s = envName === "prod" ? "" : `-${envName}`;
 
     const config = this.node.tryGetContext("neonScratch") ?? {};
     const useBedrockKnowledgeBase: boolean = config.useBedrockKnowledgeBase ?? false;
@@ -50,7 +57,7 @@ export class KnowledgeBaseStack extends cdk.Stack {
 
     // S3 bucket — lore documents for KB ingestion
     const loreBucket = new s3.Bucket(this, "LoreBucket", {
-      bucketName: `neon-scratch-lore-${account}`,
+      bucketName: `neon-scratch-lore-${account}${s}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -65,29 +72,29 @@ export class KnowledgeBaseStack extends cdk.Stack {
 
     // AOSS encryption policy (required before collection can be created)
     const encryptionPolicy = new opensearchserverless.CfnSecurityPolicy(this, "AossEncryptionPolicy", {
-      name: "neon-scratch-encryption",
+      name: `neon-scratch-encryption${s}`,
       type: "encryption",
       policy: JSON.stringify({
-        Rules: [{ ResourceType: "collection", Resource: ["collection/neon-scratch-lore"] }],
+        Rules: [{ ResourceType: "collection", Resource: [`collection/neon-scratch-lore${s}`] }],
         AWSOwnedKey: true,
       }),
     });
 
     // AOSS network policy — public access is fine for a demo
     const networkPolicy = new opensearchserverless.CfnSecurityPolicy(this, "AossNetworkPolicy", {
-      name: "neon-scratch-network",
+      name: `neon-scratch-network${s}`,
       type: "network",
       policy: JSON.stringify([{
         Rules: [
-          { ResourceType: "collection", Resource: ["collection/neon-scratch-lore"] },
-          { ResourceType: "dashboard", Resource: ["collection/neon-scratch-lore"] },
+          { ResourceType: "collection", Resource: [`collection/neon-scratch-lore${s}`] },
+          { ResourceType: "dashboard", Resource: [`collection/neon-scratch-lore${s}`] },
         ],
         AllowFromPublic: true,
       }]),
     });
 
     const collection = new opensearchserverless.CfnCollection(this, "LoreCollection", {
-      name: "neon-scratch-lore",
+      name: `neon-scratch-lore${s}`,
       type: "VECTORSEARCH",
       description: "Neon Scratch Lounge lore vector store",
     });
@@ -127,14 +134,14 @@ export class KnowledgeBaseStack extends cdk.Stack {
 
     // Custom resource Lambda — creates the vector index via AOSS data plane (SigV4 HTTP)
     const createIndexFn = new lambdaNodejs.NodejsFunction(this, "CreateAossIndex", {
-      functionName: "neon-scratch-create-aoss-index",
+      functionName: `neon-scratch-create-aoss-index${s}`,
       entry: path.join(__dirname, "../../lambda/custom-resources/create-aoss-index.ts"),
       runtime: lambda.Runtime.NODEJS_LATEST,
       timeout: cdk.Duration.minutes(5),
       bundling: { externalModules: [], minify: false, sourceMap: true, forceDockerBundling: false },
       environment: {
         COLLECTION_ENDPOINT: collection.attrCollectionEndpoint,
-        INDEX_NAME: "neon-scratch-lore-index",
+        INDEX_NAME: `neon-scratch-lore-index${s}`,
         EMBEDDING_DIMENSION: "1536",
       },
     });
@@ -146,7 +153,7 @@ export class KnowledgeBaseStack extends cdk.Stack {
 
     // Single data access policy granting both KB role and custom resource Lambda
     const dataAccessPolicy = new opensearchserverless.CfnAccessPolicy(this, "AossDataAccessPolicy", {
-      name: "neon-scratch-data-access",
+      name: `neon-scratch-data-access${s}`,
       type: "data",
       policy: JSON.stringify([{
         Rules: [
@@ -160,7 +167,7 @@ export class KnowledgeBaseStack extends cdk.Stack {
           },
           {
             ResourceType: "collection",
-            Resource: ["collection/neon-scratch-lore"],
+            Resource: [`collection/neon-scratch-lore${s}`],
             Permission: ["aoss:CreateCollectionItems", "aoss:DescribeCollectionItems"],
           },
         ],
@@ -185,7 +192,7 @@ export class KnowledgeBaseStack extends cdk.Stack {
 
     // Bedrock Knowledge Base (L1) — depends on index existing first
     const knowledgeBase = new bedrock.CfnKnowledgeBase(this, "LoreKnowledgeBase", {
-      name: "neon-scratch-lore",
+      name: `neon-scratch-lore${s}`,
       description: "Neo-Pawsburg lore — locations, enemies, items, character classes",
       roleArn: kbRole.roleArn,
       knowledgeBaseConfiguration: {
@@ -196,7 +203,7 @@ export class KnowledgeBaseStack extends cdk.Stack {
         type: "OPENSEARCH_SERVERLESS",
         opensearchServerlessConfiguration: {
           collectionArn: collection.attrArn,
-          vectorIndexName: "neon-scratch-lore-index",
+          vectorIndexName: `neon-scratch-lore-index${s}`,
           fieldMapping: {
             vectorField: "embedding",
             textField: "text",
@@ -210,7 +217,7 @@ export class KnowledgeBaseStack extends cdk.Stack {
     // S3 data source
     const dataSource = new bedrock.CfnDataSource(this, "LoreDataSource", {
       knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
-      name: "neon-scratch-lore-s3",
+      name: `neon-scratch-lore-s3${s}`,
       dataSourceConfiguration: {
         type: "S3",
         s3Configuration: {
