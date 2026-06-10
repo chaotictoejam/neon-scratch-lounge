@@ -25,7 +25,7 @@ export const handler = async (event: ProxyEvent) => {
   const queryString = `
     fields @timestamp, campaignId, latencyMs, toolName, total as diceResult, inputTokens, outputTokens, success, retryCount, newHp, previousHp, level, error, @message
     | filter campaignId = "${campaignId.replace(/[^a-zA-Z0-9\-]/g, "")}"
-    | sort @timestamp asc
+    | sort @timestamp desc
     | limit 100
   `;
 
@@ -47,7 +47,7 @@ export const handler = async (event: ProxyEvent) => {
         for (const f of row) if (f.field && f.value !== undefined) m[f.field] = f.value;
         return m;
       });
-      return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ rows }) };
+      return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ rows: rows.reverse() }) };
     }
   }
 
