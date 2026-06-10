@@ -316,7 +316,7 @@ export async function runTool(
 
   const cached = await getCachedResult<ToolResult>(idempotencyKey);
   if (cached) {
-    log({ toolName, campaignId, turnId, idempotencyHit: true });
+    log({ toolName, campaignId, turnId, idempotencyHit: true, success: true });
     return cached;
   }
 
@@ -338,6 +338,17 @@ export async function runTool(
   const toolResult: ToolResult = { toolName, result };
   await setCachedResult(idempotencyKey, toolResult);
 
-  log({ toolName, campaignId, turnId, idempotencyHit: false, success: true });
+  log({
+    toolName,
+    campaignId,
+    turnId,
+    idempotencyHit: false,
+    success: true,
+    ...(toolName === "roll-dice" ? { diceResult: (result as { total: number }).total } : {}),
+    ...(toolName === "apply-damage" ? {
+      newHp: (result as { newHp: number }).newHp,
+      previousHp: (result as { previousHp: number }).previousHp,
+    } : {}),
+  });
   return toolResult;
 }

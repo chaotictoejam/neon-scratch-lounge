@@ -254,10 +254,11 @@ export class WorkflowStack extends cdk.Stack {
       resultPath: "$.dmOutput",
     });
 
-    // Send to DLQ
+    // Send to DLQ — resultPath DISCARD preserves the original state so safeNarrativeState can access $.campaign
     const sendToDlqTask = new tasks.SqsSendMessage(this, "SendToDlq", {
       queue: this.dlq,
       messageBody: sfn.TaskInput.fromJsonPathAt("$"),
+      resultPath: sfn.JsonPath.DISCARD,
     });
 
     const persistCampaignTask = new tasks.LambdaInvoke(this, "PersistCampaignTask", {

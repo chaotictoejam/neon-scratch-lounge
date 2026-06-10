@@ -149,6 +149,7 @@ export type MechanicsAction =
   | { type: "UPDATE_WORKFLOW"; steps: WorkflowStep[] }
   | { type: "STEP_STARTED"; stepName: string }
   | { type: "STEP_DONE"; stepName: string; durationMs: number }
+  | { type: "STEP_FAILED"; stepName: string }
   | { type: "STEP_RETRY"; stepName: string; attempt: number; maxRetries: number }
   | { type: "ADD_LOG_LINE"; line: LogLine }
   | { type: "SET_LOG_LINES"; lines: LogLine[] }

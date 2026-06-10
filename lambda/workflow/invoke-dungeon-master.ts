@@ -371,6 +371,7 @@ export const handler = async (input: DmInput): Promise<DmInput & { dmOutput: DMO
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
     latencyMs: Date.now() - startMs,
+    success: true,
     ...(dmOutput.enemyDefeated ? { enemyDefeated: dmOutput.enemyDefeated } : {}),
   });
 
