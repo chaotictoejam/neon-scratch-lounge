@@ -39,6 +39,14 @@ function mechanicsReducer(state: MechanicsState, action: MechanicsAction): Mecha
         ),
       };
 
+    case "STEP_FAILED":
+      return {
+        ...state,
+        workflowSteps: state.workflowSteps.map((s) =>
+          s.name === action.stepName ? { ...s, status: "failed" } : s
+        ),
+      };
+
     case "STEP_RETRY":
       return {
         ...state,

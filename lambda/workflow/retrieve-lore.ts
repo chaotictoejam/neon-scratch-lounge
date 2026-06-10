@@ -97,6 +97,7 @@ export const handler = async (input: WorkflowInput): Promise<WorkflowInput & { l
     retrieval: KNOWLEDGE_BASE_ID ? "bedrock-kb" : "bundled-json",
     chunksRetrieved: loreChunks.length,
     latencyMs: Date.now() - start,
+    success: true,
   });
 
   return { ...input, loreChunks };

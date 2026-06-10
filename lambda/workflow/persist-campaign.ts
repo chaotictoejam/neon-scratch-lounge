@@ -121,6 +121,7 @@ export const handler = async (input: PersistInput): Promise<PersistInput> => {
     summarized: trimmedHistory.length < newHistory.length,
     activeEffectsCount: activeEffects.length,
     vanishCooldown: specialAbilityState.vanishCooldownTurnsLeft,
+    success: true,
   });
 
   // Return updated campaign for format-response

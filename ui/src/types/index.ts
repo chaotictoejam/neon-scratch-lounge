@@ -149,6 +149,7 @@ export type MechanicsAction =
   | { type: "UPDATE_WORKFLOW"; steps: WorkflowStep[] }
   | { type: "STEP_STARTED"; stepName: string }
   | { type: "STEP_DONE"; stepName: string; durationMs: number }
+  | { type: "STEP_FAILED"; stepName: string }
   | { type: "STEP_RETRY"; stepName: string; attempt: number; maxRetries: number }
   | { type: "ADD_LOG_LINE"; line: LogLine }
   | { type: "SET_LOG_LINES"; lines: LogLine[] }
@@ -199,8 +200,6 @@ export const CLASS_META: Record<CharacterClass, {
 export const WORKFLOW_STEPS_DEFAULT: WorkflowStep[] = [
   { name: "RetrieveLore", label: "RetrieveLore", service: "Bedrock KB", status: "pending" },
   { name: "InvokeDungeonMaster", label: "InvokeDungeonMaster", service: "Claude 4.5", status: "pending" },
-  { name: "ValidateAndRoute", label: "ValidateAndRoute", service: "Lambda", status: "pending" },
-  { name: "ExecuteTools", label: "ExecuteTools", service: "Lambda × 3", status: "pending" },
   { name: "PersistCampaign", label: "PersistCampaign", service: "DynamoDB", status: "pending" },
   { name: "FormatResponse", label: "FormatResponse", service: "Lambda", status: "pending" },
 ];
@@ -208,10 +207,8 @@ export const WORKFLOW_STEPS_DEFAULT: WorkflowStep[] = [
 export const STEP_ESTIMATED_START_MS: Record<string, number> = {
   RetrieveLore: 0,
   InvokeDungeonMaster: 300,
-  ValidateAndRoute: 3400,
-  ExecuteTools: 3500,
-  PersistCampaign: 3900,
-  FormatResponse: 4100,
+  PersistCampaign: 8000,
+  FormatResponse: 8500,
 };
 
 export const PLACEHOLDER_ACTIONS = [

@@ -2,19 +2,25 @@ import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
 
+export interface DataStackProps extends cdk.StackProps {
+  envName?: string;
+}
+
 export class DataStack extends cdk.Stack {
   public readonly campaignsTable: dynamodb.Table;
   public readonly toolResultsTable: dynamodb.Table;
   public readonly turnResultsTable: dynamodb.Table;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: DataStackProps) {
     super(scope, id, props);
 
     const config = this.node.tryGetContext("neonScratch") ?? {};
     const campaignTtlDays: number = config.campaignTtlDays ?? 30;
+    const envName = props?.envName ?? "prod";
+    const s = envName === "prod" ? "" : `-${envName}`;
 
     this.campaignsTable = new dynamodb.Table(this, "CampaignsTable", {
-      tableName: "neon-scratch-campaigns",
+      tableName: `neon-scratch-campaigns${s}`,
       partitionKey: { name: "campaignId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: "ttl",
@@ -32,7 +38,7 @@ export class DataStack extends cdk.Stack {
     });
 
     this.toolResultsTable = new dynamodb.Table(this, "ToolResultsTable", {
-      tableName: "neon-scratch-tool-results",
+      tableName: `neon-scratch-tool-results${s}`,
       partitionKey: { name: "idempotencyKey", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: "ttl",
@@ -40,7 +46,7 @@ export class DataStack extends cdk.Stack {
     });
 
     this.turnResultsTable = new dynamodb.Table(this, "TurnResultsTable", {
-      tableName: "neon-scratch-turn-results",
+      tableName: `neon-scratch-turn-results${s}`,
       partitionKey: { name: "turnId", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: "ttl",

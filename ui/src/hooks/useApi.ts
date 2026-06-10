@@ -39,7 +39,7 @@ export function useApi() {
         if (wasFailureInjected) {
           await injectFailure().catch((e) => console.warn("Failed to inject failure:", e));
           mechDispatch({ type: "INCREMENT_DLQ" });
-          mechDispatch({ type: "STEP_RETRY", stepName: "ExecuteTools", attempt: 1, maxRetries: 3 });
+          mechDispatch({ type: "STEP_RETRY", stepName: "InvokeDungeonMaster", attempt: 1, maxRetries: 3 });
           mechDispatch({ type: "INCREMENT_RETRY" });
         }
 
@@ -52,9 +52,14 @@ export function useApi() {
         // Apply actual workflow trace from response
         if (response.workflowTrace?.length) {
           mechDispatch({ type: "UPDATE_WORKFLOW", steps: response.workflowTrace });
+        } else if (wasFailureInjected) {
+          // DLQ recovery path: InvokeDungeonMaster failed, PersistCampaign was skipped
+          mechDispatch({ type: "STEP_DONE", stepName: "RetrieveLore", durationMs: 0 });
+          mechDispatch({ type: "STEP_FAILED", stepName: "InvokeDungeonMaster" });
+          mechDispatch({ type: "STEP_DONE", stepName: "FormatResponse", durationMs: 0 });
         } else {
-          // Mark all as done with estimated times when trace not available
-          ["RetrieveLore", "InvokeDungeonMaster", "ValidateAndRoute", "ExecuteTools", "PersistCampaign", "FormatResponse"].forEach((name) => {
+          // Mark all as done when trace not available
+          ["RetrieveLore", "InvokeDungeonMaster", "PersistCampaign", "FormatResponse"].forEach((name) => {
             mechDispatch({ type: "STEP_DONE", stepName: name, durationMs: 0 });
           });
         }
@@ -76,6 +81,9 @@ export function useApi() {
         }
       } catch (err) {
         console.error("Turn failed:", err);
+        if (wasFailureInjected) {
+          mechDispatch({ type: "STEP_FAILED", stepName: "InvokeDungeonMaster" });
+        }
         gameDispatch({
           type: "TURN_COMPLETE",
           response: {

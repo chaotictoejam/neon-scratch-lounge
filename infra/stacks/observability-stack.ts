@@ -10,17 +10,23 @@ import { Construct } from "constructs";
 
 export interface ObservabilityStackProps extends cdk.StackProps {
   dungeonControllerFunction: lambda.Function;
+  invokeDmFunctionName: string;
   stateMachine: sfn.StateMachine;
   dlq: sqs.Queue;
+  envName?: string;
 }
 
 export class ObservabilityStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ObservabilityStackProps) {
     super(scope, id, props);
 
+    const envName = props.envName ?? "prod";
+    const s = envName === "prod" ? "" : `-${envName}`;
+    const ns = `NeonScratch${envName === "prod" ? "" : envName.charAt(0).toUpperCase() + envName.slice(1)}`;
+
     // SNS topic for alerts
     const alertTopic = new sns.Topic(this, "NeonScratchAlerts", {
-      topicName: "NeonScratchAlerts",
+      topicName: `NeonScratchAlerts${s}`,
       displayName: "Neon Scratch Lounge Alerts",
     });
 
@@ -30,24 +36,19 @@ export class ObservabilityStack extends cdk.Stack {
       this, "ControllerLogGroup",
       `/aws/lambda/${props.dungeonControllerFunction.functionName}`,
     );
-    const executeToolLogGroup = logs.LogGroup.fromLogGroupName(
-      this, "ExecuteToolLogGroup",
-      "/aws/lambda/neon-scratch-execute-tool",
-    );
     const dmLogGroup = logs.LogGroup.fromLogGroupName(
       this, "DmLogGroup",
-      "/aws/lambda/neon-scratch-invoke-dungeon-master",
+      `/aws/lambda/${props.invokeDmFunctionName}`,
     );
     const formatResponseLogGroup = logs.LogGroup.fromLogGroupName(
       this, "FormatResponseLogGroup",
-      "/aws/lambda/neon-scratch-format-response",
+      `/aws/lambda/neon-scratch-format-response${s}`,
     );
 
-    // Metric filters — assigned to const to satisfy the linter; the CDK
-    // construct registers itself on the tree so no further reference is needed.
+    // Metric filters
     new logs.MetricFilter(this, "ActiveCampaignsFilter", {
       logGroup: controllerLogGroup,
-      metricNamespace: "NeonScratch",
+      metricNamespace: ns,
       metricName: "PlayerActionReceived",
       filterPattern: logs.FilterPattern.exists("$.campaignId"),
       metricValue: "1",
@@ -55,15 +56,16 @@ export class ObservabilityStack extends cdk.Stack {
 
     new logs.MetricFilter(this, "ControllerLatencyFilter", {
       logGroup: formatResponseLogGroup,
-      metricNamespace: "NeonScratch",
+      metricNamespace: ns,
       metricName: "ControllerLatencyMs",
       filterPattern: logs.FilterPattern.exists("$.latencyMs"),
       metricValue: "$.latencyMs",
     });
 
+    // Dice rolls now happen inside invoke-dungeon-master (agentic loop)
     new logs.MetricFilter(this, "DiceRollFilter", {
-      logGroup: executeToolLogGroup,
-      metricNamespace: "NeonScratch",
+      logGroup: dmLogGroup,
+      metricNamespace: ns,
       metricName: "DiceRollTotal",
       filterPattern: logs.FilterPattern.literal('{ $.toolName = "roll-dice" }'),
       metricValue: "$.total",
@@ -71,15 +73,15 @@ export class ObservabilityStack extends cdk.Stack {
 
     new logs.MetricFilter(this, "MonstersDefeatedFilter", {
       logGroup: dmLogGroup,
-      metricNamespace: "NeonScratch",
+      metricNamespace: ns,
       metricName: "MonstersDefeated",
-      filterPattern: logs.FilterPattern.literal('{ $.enemyDefeated != "null" }'),
+      filterPattern: logs.FilterPattern.exists("$.enemyDefeated"),
       metricValue: "1",
     });
 
     new logs.MetricFilter(this, "TokenUsageFilter", {
       logGroup: dmLogGroup,
-      metricNamespace: "NeonScratch",
+      metricNamespace: ns,
       metricName: "BedrockInputTokens",
       filterPattern: logs.FilterPattern.exists("$.inputTokens"),
       metricValue: "$.inputTokens",
@@ -87,7 +89,7 @@ export class ObservabilityStack extends cdk.Stack {
 
     new logs.MetricFilter(this, "DmLatencyFilter", {
       logGroup: dmLogGroup,
-      metricNamespace: "NeonScratch",
+      metricNamespace: ns,
       metricName: "DmLatencyMs",
       filterPattern: logs.FilterPattern.exists("$.latencyMs"),
       metricValue: "$.latencyMs",
@@ -95,25 +97,24 @@ export class ObservabilityStack extends cdk.Stack {
 
     // CloudWatch dashboard
     const dashboard = new cloudwatch.Dashboard(this, "NeonScratchDashboard", {
-      dashboardName: "NeonScratchLounge",
+      dashboardName: `NeonScratchLounge${s}`,
       defaultInterval: cdk.Duration.hours(1),
     });
 
     dashboard.addWidgets(
       new cloudwatch.TextWidget({
-        markdown: "# The Neon Scratch Lounge — Production Dashboard\n*Neo-Pawsburg 2087 | Powered by AWS*",
+        markdown: `# The Neon Scratch Lounge — ${envName === "prod" ? "Production" : envName.toUpperCase()} Dashboard\n*Neo-Pawsburg 2087 | Powered by AWS*`,
         width: 24,
         height: 2,
       })
     );
 
     dashboard.addWidgets(
-      // Active campaigns widget
       new cloudwatch.SingleValueWidget({
         title: "Active Campaigns (Last Hour)",
         metrics: [
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "PlayerActionReceived",
             statistic: "Sum",
             period: cdk.Duration.hours(1),
@@ -123,28 +124,11 @@ export class ObservabilityStack extends cdk.Stack {
         width: 8,
         height: 4,
       }),
-      // DLQ depth
-      new cloudwatch.SingleValueWidget({
-        title: "DLQ Depth",
-        metrics: [
-          new cloudwatch.Metric({
-            namespace: "AWS/SQS",
-            metricName: "ApproximateNumberOfMessagesVisible",
-            dimensionsMap: { QueueName: props.dlq.queueName },
-            statistic: "Maximum",
-            period: cdk.Duration.minutes(5),
-            label: "DLQ Messages",
-          }),
-        ],
-        width: 8,
-        height: 4,
-      }),
-      // Monsters defeated
       new cloudwatch.SingleValueWidget({
         title: "Monsters Defeated (Last Hour)",
         metrics: [
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "MonstersDefeated",
             statistic: "Sum",
             period: cdk.Duration.hours(1),
@@ -157,12 +141,11 @@ export class ObservabilityStack extends cdk.Stack {
     );
 
     dashboard.addWidgets(
-      // p99 dungeon-controller latency
       new cloudwatch.GraphWidget({
         title: "p99 Controller Latency (target: <10s)",
         left: [
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "ControllerLatencyMs",
             statistic: "p99",
             period: cdk.Duration.minutes(5),
@@ -173,12 +156,11 @@ export class ObservabilityStack extends cdk.Stack {
         width: 12,
         height: 6,
       }),
-      // Bedrock DM latency
       new cloudwatch.GraphWidget({
         title: "p99 DM Invocation Latency (target: <28s)",
         left: [
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "DmLatencyMs",
             statistic: "p99",
             period: cdk.Duration.minutes(5),
@@ -192,12 +174,11 @@ export class ObservabilityStack extends cdk.Stack {
     );
 
     dashboard.addWidgets(
-      // Bedrock token usage
       new cloudwatch.GraphWidget({
         title: "Bedrock Token Usage Per Turn",
         left: [
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "BedrockInputTokens",
             statistic: "Average",
             period: cdk.Duration.minutes(5),
@@ -207,26 +188,25 @@ export class ObservabilityStack extends cdk.Stack {
         width: 12,
         height: 6,
       }),
-      // Dice roll distribution — verifies fairness on stage
       new cloudwatch.GraphWidget({
         title: "Dice Roll Distribution (d20 totals — verify fairness)",
         left: [
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "DiceRollTotal",
             statistic: "Average",
             period: cdk.Duration.minutes(5),
             label: "Avg Roll",
           }),
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "DiceRollTotal",
             statistic: "Minimum",
             period: cdk.Duration.minutes(5),
             label: "Min Roll",
           }),
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "DiceRollTotal",
             statistic: "Maximum",
             period: cdk.Duration.minutes(5),
@@ -239,7 +219,6 @@ export class ObservabilityStack extends cdk.Stack {
     );
 
     dashboard.addWidgets(
-      // Step Functions success/failure
       new cloudwatch.GraphWidget({
         title: "Workflow Executions",
         left: [
@@ -274,12 +253,11 @@ export class ObservabilityStack extends cdk.Stack {
         width: 12,
         height: 6,
       }),
-      // Monsters defeated per hour
       new cloudwatch.GraphWidget({
         title: "Monsters Defeated Per Hour",
         left: [
           new cloudwatch.Metric({
-            namespace: "NeonScratch",
+            namespace: ns,
             metricName: "MonstersDefeated",
             statistic: "Sum",
             period: cdk.Duration.hours(1),
@@ -294,10 +272,10 @@ export class ObservabilityStack extends cdk.Stack {
 
     // Alarms
     const controllerP99Alarm = new cloudwatch.Alarm(this, "ControllerLatencyAlarm", {
-      alarmName: "NeonScratch-ControllerP99LatencyHigh",
+      alarmName: `NeonScratch${s}-ControllerP99LatencyHigh`,
       alarmDescription: "p99 dungeon-controller latency exceeded 10s",
       metric: new cloudwatch.Metric({
-        namespace: "NeonScratch",
+        namespace: ns,
         metricName: "ControllerLatencyMs",
         statistic: "p99",
         period: cdk.Duration.minutes(5),
@@ -310,10 +288,10 @@ export class ObservabilityStack extends cdk.Stack {
     controllerP99Alarm.addAlarmAction(new cloudwatchActions.SnsAction(alertTopic));
 
     const dmP99Alarm = new cloudwatch.Alarm(this, "DmLatencyAlarm", {
-      alarmName: "NeonScratch-DmP99LatencyHigh",
+      alarmName: `NeonScratch${s}-DmP99LatencyHigh`,
       alarmDescription: "p99 invoke-dungeon-master latency exceeded 28s",
       metric: new cloudwatch.Metric({
-        namespace: "NeonScratch",
+        namespace: ns,
         metricName: "DmLatencyMs",
         statistic: "p99",
         period: cdk.Duration.minutes(5),
@@ -326,7 +304,7 @@ export class ObservabilityStack extends cdk.Stack {
     dmP99Alarm.addAlarmAction(new cloudwatchActions.SnsAction(alertTopic));
 
     const dlqDepthAlarm = new cloudwatch.Alarm(this, "DlqDepthAlarm", {
-      alarmName: "NeonScratch-DlqDepthAboveZero",
+      alarmName: `NeonScratch${s}-DlqDepthAboveZero`,
       alarmDescription: "DLQ has messages — tool execution failed after all retries",
       metric: new cloudwatch.Metric({
         namespace: "AWS/SQS",
@@ -343,7 +321,7 @@ export class ObservabilityStack extends cdk.Stack {
     dlqDepthAlarm.addAlarmAction(new cloudwatchActions.SnsAction(alertTopic));
 
     const errorRateAlarm = new cloudwatch.Alarm(this, "ErrorRateAlarm", {
-      alarmName: "NeonScratch-HighErrorRate",
+      alarmName: `NeonScratch${s}-HighErrorRate`,
       alarmDescription: "Step Functions failure rate exceeded 10% over 5 minutes",
       metric: new cloudwatch.MathExpression({
         expression: "failures / (successes + failures) * 100",
@@ -373,7 +351,6 @@ export class ObservabilityStack extends cdk.Stack {
     });
     errorRateAlarm.addAlarmAction(new cloudwatchActions.SnsAction(alertTopic));
 
-    // Update alarm status widget with actual alarms
     dashboard.addWidgets(
       new cloudwatch.AlarmStatusWidget({
         title: "Active Alarms",
@@ -384,7 +361,7 @@ export class ObservabilityStack extends cdk.Stack {
     );
 
     new cdk.CfnOutput(this, "DashboardUrl", {
-      value: `https://${this.region}.console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=NeonScratchLounge`,
+      value: `https://${this.region}.console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=NeonScratchLounge${s}`,
       description: "CloudWatch dashboard URL",
     });
     new cdk.CfnOutput(this, "AlertTopicArn", { value: alertTopic.topicArn });

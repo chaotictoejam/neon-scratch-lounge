@@ -10,11 +10,12 @@ Built as a live conference demo for AWS LA Summit 2026. The contrast between "cy
 
 A fully-deployed, playable RPG where every player action flows through a real AWS architecture: API Gateway → Lambda → Step Functions → Bedrock (Claude) → DynamoDB. The UI shows the AWS mechanics in real time alongside the game — Step Functions workflow trace, CloudWatch log events, token counts, and dice rolls.
 
-The demo was used to illustrate five reliability patterns you'd find in any serious AI agent system:
+The demo illustrates five reliability patterns you'd find in any serious AI agent system:
 
 1. **Retrieval-Augmented Generation** — lore retrieved and injected as context before every Bedrock call
-2. **Step Functions retries** — exponential backoff with full jitter on DM validation errors
-3. **Dead Letter Queue** — tool failures caught after 3 retries, safe narrative returned to the player
+2. **Step Functions retries** — exponential backoff with full jitter on named errors (`DemoForcedFailure`, `DMOutputValidationError`)
+   - The DM uses Bedrock's native tool-use loop to call dice/combat/inventory tools and see real results before writing narrative
+3. **Dead Letter Queue** — DM invocation failures caught after all retries, failed state sent to SQS DLQ, safe narrative returned to the player via FormatResponse
 4. **Idempotency** — tool results cached in DynamoDB with TTL, scoped to `campaignId:turnId:toolName`
 5. **Structured observability** — every Lambda emits one JSON log line per request, queryable via CloudWatch Logs Insights
 
@@ -31,19 +32,53 @@ API Gateway REST API
      ▼
 dungeon-controller (Lambda)
      │  publishes PlayerAction to EventBridge (audit trail)
-     │  starts Express Workflow synchronously
+     │  starts Express Workflow async → returns turnId immediately
+     │  player polls GET /action/status?turnId=... for result
      ▼
 Step Functions Express Workflow
      │
      ├── RetrieveLore          → lore context injected before DM call (see modes below)
-     ├── InvokeDungeonMaster   → bedrock.InvokeModel (claude-sonnet-4)
-     │     └── retry: DMOutputValidationError (MaxAttempts: 3, FULL jitter)
-     ├── ValidateAndRoute      → filter ALLOWED_TOOLS
-     ├── ExecuteTools (Map)    → run each tool call in sequence
-     │     └── retry: States.TaskFailed (MaxAttempts: 3, FULL jitter)
-     │     └── catch → SQS DLQ + SafeNarrative pass state
+     ├── InvokeDungeonMaster   → Bedrock native tool-use agentic loop (Claude Sonnet 4)
+     │     │   DM calls game tools → sees real results → calls finalize-response
+     │     ├── retry: DemoForcedFailure    (MaxAttempts: 3, FULL jitter)
+     │     ├── retry: DMOutputValidationError (MaxAttempts: 3, FULL jitter)
+     │     └── catch: States.ALL → SQS DLQ → safe narrative → FormatResponse
      ├── PersistCampaign       → DynamoDB put; summarise if history > 20 turns
-     └── FormatResponse        → typed FormattedResponse returned to player
+     └── FormatResponse        → typed FormattedResponse written to DynamoDB, turnId resolved
+```
+
+### Agentic tool-use loop in InvokeDungeonMaster
+
+`invoke-dungeon-master` runs a multi-turn Bedrock conversation loop rather than a single-shot prompt. The DM is given 9 tools:
+
+| Tool | Purpose |
+|---|---|
+| `roll-dice` | Roll dN (d4/d6/d8/d10/d12/d20) — d20 enforced for skill checks |
+| `apply-damage` | Apply damage or healing to a combatant |
+| `update-inventory` | Add or remove items from player inventory |
+| `award-xp` | Grant XP and trigger level-up if threshold reached |
+| `update-location` | Move player to a new location |
+| `apply-effect` | Apply status effects with duration |
+| `use-special-ability` | Activate class special ability |
+| `update-quest-log` | Record quest progress |
+| `finalize-response` | **Required last call** — carries the narrative, combat summary, and game state |
+
+The loop runs until the DM calls `finalize-response` (max 12 tool iterations). All tool execution happens inside the Lambda via `lambda/shared/tool-runner.ts`, so the DM always sees real dice totals before writing narrative.
+
+```
+invoke-dungeon-master loop:
+  send message to Bedrock (tools array)
+       │
+       ▼
+  stop_reason == "tool_use"?
+  │  yes → execute each tool via tool-runner.ts
+  │         write tool_result blocks
+  │         send next message with tool results
+  │         └── repeat
+  │
+  └── stop_reason == "end_turn" after finalize-response
+       → extract DMOutput from finalize-response args
+       → return to Step Functions
 ```
 
 ### RetrieveLore — two modes
@@ -71,7 +106,8 @@ EventBridge custom bus (neon-scratch-events)
 
 DynamoDB (on-demand)
      ├── neon-scratch-campaigns    (campaignId PK, playerId GSI, TTL 30 days)
-     └── neon-scratch-tool-results (idempotencyKey PK, TTL 1 hour)
+     ├── neon-scratch-tool-results (idempotencyKey PK, TTL 1 hour)
+     └── neon-scratch-turn-results (turnId PK, TTL)
 
 SQS Dead Letter Queue
      └── neon-scratch-dungeon-dlq (14-day retention)
@@ -80,11 +116,11 @@ CloudWatch
      ├── Log groups per Lambda (1-week retention)
      ├── Metric filters (token usage, dice rolls, monsters defeated, active campaigns)
      ├── Dashboard: NeonScratchLounge
-     └── Alarms (DLQ depth, DM error rate, controller latency p99)
+     └── Alarms (DLQ depth, DM p99 latency, controller p99 latency, error rate)
 
 API Gateway (REST, prod stage)
      ├── POST /action              → dungeon-controller
-     ├── POST /demo/inject-failure → toggles FORCE_TOOL_FAILURE env var on execute-tool
+     ├── POST /demo/inject-failure → sets FORCE_TOOL_FAILURE=true on invoke-dungeon-master
      ├── POST /demo/clear-failure  → clears the env var
      └── GET  /demo/logs           → CloudWatch Logs Insights query for a campaignId
 ```
@@ -108,6 +144,8 @@ API Gateway (REST, prod stage)
 
 ## Deploy
 
+### Production
+
 ```bash
 npm install
 cd infra
@@ -115,6 +153,21 @@ npx cdk deploy --all
 ```
 
 The deploy outputs `NeonScratchApi.ApiUrl` — you'll need that for the UI.
+
+### Dev environment
+
+All physical resource names are suffixed (`-dev`), so dev and prod can coexist in the same account without collision:
+
+```bash
+cd infra
+npx cdk deploy --all -c envName=dev
+```
+
+Stack names get a capitalised suffix (`NeonScratchData-Dev`, `NeonScratchWorkflow-Dev`, etc.). CloudWatch metrics use the `NeonScratchDev` namespace. To destroy the dev environment independently:
+
+```bash
+npx cdk destroy --all -c envName=dev
+```
 
 ---
 
@@ -130,7 +183,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-The CloudWatch Logs panel in the UI polls `GET /demo/logs?campaignId=<id>` after each turn and displays the actual Lambda invocation records filtered to the active campaign.
+The CloudWatch Logs panel polls `GET /demo/logs?campaignId=<id>` after each turn and displays the actual Lambda invocation records filtered to the active campaign.
 
 For a production static hosting setup:
 
@@ -138,6 +191,21 @@ For a production static hosting setup:
 npm run build
 aws s3 sync dist/ s3://your-bucket
 ```
+
+---
+
+## Demo: failure injection
+
+The failure injection demo shows Step Functions retrying the `InvokeDungeonMaster` task after a forced error.
+
+**How it works:**
+
+1. `POST /demo/inject-failure` — sets `FORCE_TOOL_FAILURE=true` as an environment variable on the `invoke-dungeon-master` Lambda.
+2. On the next player action, `invoke-dungeon-master` throws a `DemoForcedFailure` named error the first time it tries to execute a tool.
+3. Step Functions catches `DemoForcedFailure` and retries the task up to 3 times with exponential backoff and full jitter.
+4. `POST /demo/clear-failure` — clears the env var so subsequent turns succeed.
+
+The UI shows the retry animation in the workflow trace while the DM is being re-invoked.
 
 ---
 
@@ -212,7 +280,7 @@ npm test
 
 - `test/dice.test.ts` — dice ranges, stat bonuses, idempotency key format
 - `test/idempotency.test.ts` — cache hit/miss, TTL expiry, cross-turn isolation
-- `test/validate-tools.test.ts` — ALLOWED_TOOLS filtering, unknown tool rejection
+- `test/validate-tools.test.ts` — tool schema validation, unknown tool rejection
 - `test/campaign-summary.test.ts` — summary triggers at 20 turns, history trimming
 - `test/special-abilities.test.ts` — NineLifes, Shield, Vanish cooldown mechanics
 - `test/integration/workflow.test.ts` — CDK synth assertions, class stat invariants
@@ -223,7 +291,7 @@ npm test
 
 ```
 ├── infra/
-│   ├── bin/app.ts                     CDK entry point
+│   ├── bin/app.ts                     CDK entry point (reads envName from context)
 │   ├── stacks/
 │   │   ├── data-stack.ts             DynamoDB tables
 │   │   ├── knowledge-base-stack.ts   AOSS + Bedrock KB (only when useBedrockKnowledgeBase: true)
@@ -232,15 +300,25 @@ npm test
 │   │   └── observability-stack.ts    CloudWatch dashboard + alarms
 │   └── cdk.json                      Config + context variables
 ├── lambda/
-│   ├── shared/                        types.ts, logger.ts, idempotency.ts
-│   ├── dungeon-controller/index.ts    API entry point, synchronous SFN caller
-│   ├── demo/                          inject-failure.ts, fetch-logs.ts
-│   └── workflow/                      retrieve-lore, invoke-dm, validate-route,
-│                                      execute-tool, persist-campaign, format-response
-├── lore/                              locations.json, enemies.json, items.json, classes.json
-├── scripts/demo.ts                    CLI helper used during the live demo
+│   ├── shared/
+│   │   ├── types.ts                  Shared TypeScript types
+│   │   ├── logger.ts                 Structured JSON logger
+│   │   ├── idempotency.ts            DynamoDB idempotency cache
+│   │   └── tool-runner.ts            All 8 game tool functions + runTool() dispatcher
+│   ├── dungeon-controller/index.ts   API entry point, starts SFN async, returns turnId
+│   ├── demo/
+│   │   ├── inject-failure.ts         Injects/clears FORCE_TOOL_FAILURE on invoke-dungeon-master
+│   │   └── fetch-logs.ts             CloudWatch Logs Insights query helper
+│   └── workflow/
+│       ├── retrieve-lore.ts          RAG or bundled JSON lore retrieval
+│       ├── invoke-dungeon-master.ts  Bedrock agentic loop — calls tools, writes finalize-response
+│       ├── execute-tool.ts           Thin wrapper over tool-runner (deployed, not in SFN chain)
+│       ├── persist-campaign.ts       DynamoDB campaign state write + history summarisation
+│       └── format-response.ts        Shapes final typed response for the player
+├── lore/                             locations.json, enemies.json, items.json, classes.json
+├── scripts/demo.ts                   CLI helper used during the live demo
 ├── test/
-├── ui/                                React + Vite + Tailwind game UI
+├── ui/                               React + Vite + Tailwind game UI
 └── README.md
 ```
 
@@ -250,18 +328,20 @@ npm test
 
 Estimates in USD/month. Claude Sonnet 4 at $3.00/1M input, $15.00/1M output.
 
+The agentic loop runs 2–4 Bedrock turns per player action (tool calls + finalize-response), and input tokens accumulate across iterations because each call re-sends prior messages and tool results. Tool schemas (9 tools) and lore context add ~3,500–4,000 tokens of overhead per turn. Typical observed usage: ~9,000–12,000 input + 700–1,000 output tokens per turn.
+
 | Service | Idle (no AOSS) | 500 req/mo | 5,000 req/mo |
 |---|---|---|---|
-| Amazon Bedrock | — | ~$6.20 | ~$62.00 |
-| CloudWatch (dashboard + 3 alarms) | $3.33 | $3.33 | $3.33 |
-| Lambda (7 fns × ~400 ms × 512 MB) | — | $0.02 | $0.23 |
+| Amazon Bedrock | — | ~$20.00 | ~$200.00 |
+| CloudWatch (dashboard + 4 alarms) | $3.50 | $3.50 | $3.50 |
+| Lambda (6 fns × ~2s avg × 512 MB) | — | $0.02 | $0.25 |
 | Step Functions Express | — | $0.04 | $0.40 |
 | DynamoDB + API GW + EventBridge + SQS | — | $0.01 | $0.10 |
-| **Total** | **~$3.35** | **~$9.60** | **~$66.06** |
+| **Total** | **~$3.52** | **~$23.57** | **~$204.25** |
 
 Add ~$701/month for the AOSS mode (4 OCU minimum regardless of traffic).
 
-Bedrock cost per request ≈ $0.012 (1,500 input + 400 output tokens for invoke-dm, plus an amortised summarise call every 20 turns). Verify current pricing at [aws.amazon.com/bedrock/pricing](https://aws.amazon.com/bedrock/pricing/).
+Bedrock cost per request ≈ $0.040 (~10,000 input + 850 output tokens across the agentic loop, plus an amortised summarise call every 20 turns). Verify current pricing at [aws.amazon.com/bedrock/pricing](https://aws.amazon.com/bedrock/pricing/).
 
 ---
 
@@ -270,6 +350,8 @@ Bedrock cost per request ≈ $0.012 (1,500 input + 400 output tokens for invoke-
 ```bash
 cd infra
 npx cdk destroy --all
+# or for dev environment:
+npx cdk destroy --all -c envName=dev
 ```
 
 S3 buckets and DynamoDB tables use `RemovalPolicy.DESTROY` for easy teardown.
@@ -278,4 +360,4 @@ S3 buckets and DynamoDB tables use `RemovalPolicy.DESTROY` for easy teardown.
 
 ## TODO
 
-- **Item stat bonuses** — inventory is currently a flat string array; equipping gear (e.g. `HackingClaws`) does not modify `playerStats`. Add a static item registry in `execute-tool.ts` that applies/reverses stat deltas on pickup/drop (auto-equip on pickup first, then explicit equip action).
+- **Item stat bonuses** — inventory is currently a flat string array; equipping gear (e.g. `HackingClaws`) does not modify `playerStats`. Add a static item registry in `tool-runner.ts` that applies/reverses stat deltas on pickup/drop (auto-equip on pickup first, then explicit equip action).
