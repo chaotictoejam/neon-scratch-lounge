@@ -135,7 +135,7 @@ const GAME_TOOLS = [
         gameOverReason: { type: ["string", "null"], enum: ["death", "victory", null] },
         dmInternalNote: { type: "string" },
       },
-      required: ["narrative", "combatOccurred", "combatants", "gameOver", "gameOverReason", "dmInternalNote"],
+      required: ["narrative", "enemyDefeated", "combatOccurred", "combatants", "gameOver", "gameOverReason", "dmInternalNote"],
     },
   },
 ];
@@ -232,6 +232,12 @@ export const handler = async (input: DmInput): Promise<DmInput & { dmOutput: DMO
   const { campaignId, campaign, correlationId } = input;
   const turnId = String(campaign.turnsPlayed + 1);
   const startMs = Date.now();
+
+  if (process.env.FORCE_TOOL_FAILURE === "true") {
+    const err = new Error("failure injection active");
+    err.name = "DemoForcedFailure";
+    throw err;
+  }
 
   const messages: Message[] = [
     { role: "user", content: buildUserMessage(input) },

@@ -328,20 +328,20 @@ npm test
 
 Estimates in USD/month. Claude Sonnet 4 at $3.00/1M input, $15.00/1M output.
 
-The agentic loop runs multiple Bedrock turns per player action (DM calls tools, receives results, calls `finalize-response`). Typical turns use ~3,000 input + 800 output tokens across all loop iterations.
+The agentic loop runs 2–4 Bedrock turns per player action (tool calls + finalize-response), and input tokens accumulate across iterations because each call re-sends prior messages and tool results. Tool schemas (9 tools) and lore context add ~3,500–4,000 tokens of overhead per turn. Typical observed usage: ~9,000–12,000 input + 700–1,000 output tokens per turn.
 
 | Service | Idle (no AOSS) | 500 req/mo | 5,000 req/mo |
 |---|---|---|---|
-| Amazon Bedrock | — | ~$12.00 | ~$120.00 |
+| Amazon Bedrock | — | ~$20.00 | ~$200.00 |
 | CloudWatch (dashboard + 4 alarms) | $3.50 | $3.50 | $3.50 |
 | Lambda (6 fns × ~2s avg × 512 MB) | — | $0.02 | $0.25 |
 | Step Functions Express | — | $0.04 | $0.40 |
 | DynamoDB + API GW + EventBridge + SQS | — | $0.01 | $0.10 |
-| **Total** | **~$3.52** | **~$15.57** | **~$124.25** |
+| **Total** | **~$3.52** | **~$23.57** | **~$204.25** |
 
 Add ~$701/month for the AOSS mode (4 OCU minimum regardless of traffic).
 
-Bedrock cost per request ≈ $0.021 (3,000 input + 800 output tokens across the agentic loop, plus an amortised summarise call every 20 turns). Verify current pricing at [aws.amazon.com/bedrock/pricing](https://aws.amazon.com/bedrock/pricing/).
+Bedrock cost per request ≈ $0.040 (~10,000 input + 850 output tokens across the agentic loop, plus an amortised summarise call every 20 turns). Verify current pricing at [aws.amazon.com/bedrock/pricing](https://aws.amazon.com/bedrock/pricing/).
 
 ---
 

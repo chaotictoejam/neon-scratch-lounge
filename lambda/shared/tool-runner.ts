@@ -312,12 +312,6 @@ export async function runTool(
   campaignId: string,
   turnId: string,
 ): Promise<ToolResult> {
-  if (process.env.FORCE_TOOL_FAILURE === "true") {
-    const err = new Error("failure injection active");
-    err.name = "DemoForcedFailure";
-    throw err;
-  }
-
   const idempotencyKey = makeIdempotencyKey(campaignId, turnId, toolName, String(toolArgs.purpose ?? toolArgs.item ?? toolName));
 
   const cached = await getCachedResult<ToolResult>(idempotencyKey);

@@ -125,21 +125,6 @@ export class ObservabilityStack extends cdk.Stack {
         height: 4,
       }),
       new cloudwatch.SingleValueWidget({
-        title: "DLQ Depth",
-        metrics: [
-          new cloudwatch.Metric({
-            namespace: "AWS/SQS",
-            metricName: "ApproximateNumberOfMessagesVisible",
-            dimensionsMap: { QueueName: props.dlq.queueName },
-            statistic: "Maximum",
-            period: cdk.Duration.minutes(5),
-            label: "DLQ Messages",
-          }),
-        ],
-        width: 8,
-        height: 4,
-      }),
-      new cloudwatch.SingleValueWidget({
         title: "Monsters Defeated (Last Hour)",
         metrics: [
           new cloudwatch.Metric({
